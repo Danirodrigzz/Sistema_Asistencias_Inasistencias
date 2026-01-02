@@ -313,63 +313,75 @@ const TeacherDashboard = ({ onLogout }) => {
       if (!user) return;
 
       // 1. Profile
-      const { data: profile } = await supabase
+      const { data: profile, error: pError } = await supabase
         .from('faculty_members')
         .select('*')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
+
+      if (pError) console.error('Error fetching profile:', pError);
+
+      if (!profile) {
+        console.warn('No faculty record found for email:', user.email);
+        setTeacherProfile(null);
+        setLoading(false);
+        return;
+      }
+
       setTeacherProfile(profile);
 
-      if (profile) {
-        // 2. Schedule
-        const { data: schedule } = await supabase
-          .from('master_schedule')
-          .select('*, academic_chairs(name, type, room)')
-          .eq('faculty_id', profile.id);
+      // 2. Schedule
+      const { data: schedule, error: sError } = await supabase
+        .from('master_schedule')
+        .select('*, academic_chairs(name, type, room)')
+        .eq('faculty_id', profile.id);
 
-        const formattedSchedule = (schedule || []).map(s => ({
-          id: s.id,
-          day: s.day,
-          time: s.time,
-          chair: s.academic_chairs?.name,
-          type: s.academic_chairs?.type,
-          room: s.room || s.academic_chairs?.room
-        }));
-        setMySchedule(formattedSchedule);
+      if (sError) console.error('Error schedule:', sError);
 
-        // 3. Attendance
-        const { data: attendance, error: attError } = await supabase
-          .from('attendance')
-          .select('*')
-          .eq('faculty_id', profile.id)
-          .order('check_in', { ascending: false });
+      const formattedSchedule = (schedule || []).map(s => ({
+        id: s.id,
+        day: s.day,
+        time: s.time,
+        chair: s.academic_chairs?.name || 'Cátedra desconocida',
+        type: s.academic_chairs?.type || 'N/A',
+        room: s.room || s.academic_chairs?.room || 'Sin aula'
+      }));
+      setMySchedule(formattedSchedule);
 
-        if (attError) console.error('Error attendance:', attError);
+      // 3. Attendance
+      const { data: attendance, error: attError } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('faculty_id', profile.id)
+        .order('check_in', { ascending: false });
 
-        if (attendance && attendance.length > 0) {
-          const lastEntry = attendance[0];
-          if (!lastEntry.check_out) {
-            setIsCheckedIn(true);
-          }
+      if (attError) console.error('Error attendance:', attError);
+
+      if (attendance && attendance.length > 0) {
+        const lastEntry = attendance[0];
+        if (!lastEntry.check_out) {
+          setIsCheckedIn(true);
         }
-
-        const formattedHistory = (attendance || []).map(a => ({
-          id: a.id,
-          date: new Date(a.check_in).toLocaleDateString(),
-          chair: 'Clase Registrada',
-          entry: new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          exit: a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
-          status: a.status
-        }));
-        setMyAttendance(formattedHistory);
-
-        // 4. Justifications
-        const { data: justs } = await supabase
-          .from('justifications')
-          .select('*')
-          .eq('faculty_id', profile.id);
-        setMyJustifications(justs || []);
       }
+
+      const formattedHistory = (attendance || []).map(a => ({
+        id: a.id,
+        date: new Date(a.check_in).toLocaleDateString(),
+        chair: 'Clase Registrada',
+        entry: new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        exit: a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+        status: a.status
+      }));
+      setMyAttendance(formattedHistory);
+
+      // 4. Justifications
+      const { data: justs, error: jError } = await supabase
+        .from('justifications')
+        .select('*')
+        .eq('faculty_id', profile.id);
+
+      if (jError) console.error('Error justifications:', jError);
+      setMyJustifications(justs || []);
     } catch (error) {
       console.error('Error fetching teacher data:', error);
     } finally {
@@ -987,7 +999,11 @@ const TeacherDashboard = ({ onLogout }) => {
         <header style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p className="text-muted" style={{ fontWeight: 600 }}>Bienvenido de nuevo</p>
-            <h1 style={{ fontSize: '2.5rem' }}>{teacherProfile ? `Prof. ${teacherProfile.name}` : 'Cargando...'}</h1>
+            <h1 style={{ fontSize: '2.5rem' }}>
+              {loading ? 'Inicializando...' :
+                teacherProfile ? `Prof. ${teacherProfile.name}` :
+                  'Usuario no registrado en Personal Docente'}
+            </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             {/* Clock for Teacher */}
@@ -1001,12 +1017,12 @@ const TeacherDashboard = ({ onLogout }) => {
               boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
               background: 'rgba(255,255,255,0.4)'
             }}>
-              <Clock size={18} className="text-terracotta" />
+              <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
-                <span style={{ display: 'block', fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>
+                <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1 }}>
                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                   {time.toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
               </div>
@@ -1020,7 +1036,19 @@ const TeacherDashboard = ({ onLogout }) => {
             </div>
           </div>
         </header>
-        {renderContent()}
+        {!teacherProfile && !loading ? (
+          <div className="card" style={{ textAlign: 'center', padding: '4rem' }}>
+            <AlertCircle size={48} className="text-warning" style={{ margin: '0 auto 1.5rem' }} />
+            <h2 className="brand-font">Acceso Limitado</h2>
+            <p className="text-muted" style={{ maxWidth: '500px', margin: '1rem auto' }}>
+              Tu cuenta de correo <strong>{user?.email}</strong> no está vinculada a ningún registro en la tabla de <strong>Personal Docente</strong>.
+              Por favor, contacta al administrador para que te asigne una cátedra y active tu perfil.
+            </p>
+            <button className="btn-primary" onClick={onLogout} style={{ marginTop: '2rem' }}>Cerrar Sesión</button>
+          </div>
+        ) : (
+          renderContent()
+        )}
       </main>
 
       <AnimatePresence>
