@@ -38,7 +38,8 @@ import {
   BellRing,
   ShieldCheck,
   Smartphone,
-  ChevronDown
+  ChevronDown,
+  Menu
 } from 'lucide-react'
 import {
   BarChart,
@@ -278,7 +279,7 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-const TeacherDashboard = ({ onLogout }) => {
+const TeacherDashboard = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('attendance');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [time, setTime] = useState(new Date());
@@ -300,6 +301,7 @@ const TeacherDashboard = ({ onLogout }) => {
   const [showHistoryFilter, setShowHistoryFilter] = useState(false);
   const [showJustifyChair, setShowJustifyChair] = useState(false);
   const [justificationChair, setJustificationChair] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const showNotification = (message, type = 'success') => {
     setToast({ message, type });
@@ -309,20 +311,23 @@ const TeacherDashboard = ({ onLogout }) => {
   const fetchTeacherData = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      if (!sessionUser) {
+        setLoading(false);
+        return;
+      }
 
       // 1. Profile
       const { data: profile, error: pError } = await supabase
         .from('faculty_members')
         .select('*')
-        .eq('email', user.email)
+        .eq('email', sessionUser.email)
         .maybeSingle();
 
       if (pError) console.error('Error fetching profile:', pError);
 
       if (!profile) {
-        console.warn('No faculty record found for email:', user.email);
+        console.warn('No faculty record found for email:', sessionUser.email);
         setTeacherProfile(null);
         setLoading(false);
         return;
@@ -519,11 +524,11 @@ const TeacherDashboard = ({ onLogout }) => {
                 <h2 className="clock-display">
                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </h2>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
                   {!isCheckedIn ? (
                     <button
                       className="btn-primary"
-                      style={{ padding: '1.25rem 3rem', fontSize: '1.1rem' }}
+                      style={{ padding: '1rem 2rem', fontSize: '1rem', flex: '1', minWidth: '200px' }}
                       onClick={handleCheckIn}
                     >
                       Marcar Entrada
@@ -531,7 +536,7 @@ const TeacherDashboard = ({ onLogout }) => {
                   ) : (
                     <button
                       className="btn-primary"
-                      style={{ background: 'var(--danger)', padding: '1.25rem 3rem', fontSize: '1.1rem' }}
+                      style={{ background: 'var(--danger)', padding: '1rem 2rem', fontSize: '1rem', flex: '1', minWidth: '200px' }}
                       onClick={handleCheckIn}
                     >
                       Marcar Salida
@@ -539,7 +544,7 @@ const TeacherDashboard = ({ onLogout }) => {
                   )}
                   <button
                     className="btn-outline"
-                    style={{ borderColor: 'white', color: 'white' }}
+                    style={{ borderColor: 'white', color: 'white', padding: '1rem 2rem', flex: '1', minWidth: '200px' }}
                     onClick={handleReposicion}
                   >
                     Marcar como Reposición
@@ -686,43 +691,41 @@ const TeacherDashboard = ({ onLogout }) => {
                 </div>
               </div>
             </div>
-            <div className="card">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', borderBottom: '2px solid #f8f8f8' }}>
-                    <th style={{ padding: '1.5rem 1rem' }}>Fecha</th>
-                    <th style={{ padding: '1.5rem 1rem' }}>Cátedra</th>
-                    <th style={{ padding: '1.5rem 1rem' }}>Entrada</th>
-                    <th style={{ padding: '1.5rem 1rem' }}>Salida</th>
-                    <th style={{ padding: '1.5rem 1rem' }}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredHistory.map(h => (
-                    <tr key={h.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                      <td style={{ padding: '1.25rem 1rem', fontWeight: 600 }}>{h.date}</td>
-                      <td style={{ padding: '1.25rem 1rem' }}>{h.chair}</td>
-                      <td style={{ padding: '1.25rem 1rem' }}>{h.entry}</td>
-                      <td style={{ padding: '1.25rem 1rem' }}>{h.exit}</td>
-                      <td style={{ padding: '1.25rem 1rem' }}>
-                        <span className={`badge ${h.status === 'Presente' ? 'badge-success' :
-                          h.status === 'Repuesta' ? 'badge-forest' :
-                            h.status === 'Ausente' ? 'badge-danger' : 'badge-warning'
-                          }`} style={{
-                            backgroundColor: h.status === 'Repuesta' ? 'rgba(27, 67, 50, 0.1)' : '',
-                            color: h.status === 'Repuesta' ? 'var(--secondary)' : ''
-                          }}>
-                          {h.status}
-                        </span>
-                      </td>
+
+            <div className="card animate-fade">
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                      <th style={{ padding: '1rem' }}>Fecha</th>
+                      <th style={{ padding: '1rem' }}>Cátedra</th>
+                      <th style={{ padding: '1rem' }}>Entrada</th>
+                      <th style={{ padding: '1rem' }}>Salida</th>
+                      <th style={{ padding: '1rem' }}>Estado</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredHistory.map(h => (
+                      <tr key={h.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                        <td style={{ padding: '1rem', fontWeight: 600 }}>{new Date(h.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                        <td style={{ padding: '1rem' }}>{h.chair}</td>
+                        <td style={{ padding: '1rem', fontWeight: 700 }}>{h.entry}</td>
+                        <td style={{ padding: '1rem', fontWeight: 700 }}>{h.exit}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span className={`badge ${h.status === 'Presente' || h.status === 'A tiempo' ? 'badge-success' :
+                            h.status === 'Retraso' || h.status === 'Tarde' ? 'badge-warning' : 'badge-danger'}`}>
+                            {h.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {filteredHistory.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  <History size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                  <p>No se encontraron registros en el historial</p>
+                  <Search size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                  <p>No se encontraron registros de asistencia.</p>
                 </div>
               )}
             </div>
@@ -737,17 +740,17 @@ const TeacherDashboard = ({ onLogout }) => {
 
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 className="brand-font" style={{ fontSize: '2rem' }}>Próximas Clases</h2>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div className="glass" style={{ padding: '0.6rem 1.2rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.8rem', width: '300px' }}>
-                  <Search size={18} className="text-terracotta" style={{ opacity: 0.7 }} />
+            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <h2 className="brand-font" style={{ fontSize: '2rem', margin: 0 }}>Próximas Clases</h2>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '1', justifyContent: 'flex-end', minWidth: '280px' }}>
+                <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1.2rem', borderRadius: '16px', flex: '1', maxWidth: '400px' }}>
+                  <Search size={18} className="text-forest" />
                   <input
                     type="text"
                     placeholder="Buscar cátedra..."
                     value={scheduleSearch}
                     onChange={(e) => setScheduleSearch(e.target.value)}
-                    style={{ border: 'none', background: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', fontWeight: 500 }}
+                    style={{ border: 'none', background: 'none', marginLeft: '0.8rem', outline: 'none', width: '100%', fontWeight: 500 }}
                   />
                 </div>
 
@@ -758,7 +761,7 @@ const TeacherDashboard = ({ onLogout }) => {
                     className="glass"
                     style={{
                       padding: '0.6rem 1.2rem',
-                      borderRadius: '14px',
+                      borderRadius: '16px',
                       border: '1px solid rgba(0,0,0,0.05)',
                       outline: 'none',
                       fontSize: '0.9rem',
@@ -906,7 +909,7 @@ const TeacherDashboard = ({ onLogout }) => {
                             border: '1px solid rgba(0,0,0,0.05)'
                           }}
                         >
-                          {['Piano III', 'Armonía I', 'Teoría II', 'Canto I'].map(c => (
+                          {Array.from(new Set(mySchedule.map(s => s.chair))).map(c => (
                             <button
                               key={c}
                               onClick={() => {
@@ -945,15 +948,30 @@ const TeacherDashboard = ({ onLogout }) => {
               </div>
               <div className="card">
                 <h3 style={{ marginBottom: '1.5rem' }}>Estados de Trámite</h3>
-                {myJustifications.length > 0 ? myJustifications.map(j => (
-                  <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-cream)', borderRadius: '12px', marginBottom: '1rem' }}>
-                    <div>
-                      <p style={{ fontWeight: 700 }}>{new Date(j.created_at).toLocaleDateString()}</p>
-                      <p className="text-muted" style={{ fontSize: '0.8rem' }}>{j.reason}</p>
-                    </div>
-                    <span className={`badge ${j.status === 'Aprobado' ? 'badge-success' : 'badge-warning'}`}>{j.status}</span>
+                {myJustifications.length > 0 ? (
+                  <div className="table-responsive">
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', borderBottom: '2px solid #f8f8f8' }}>
+                          <th style={{ padding: '0.75rem 0.5rem' }}>Fecha</th>
+                          <th style={{ padding: '0.75rem 0.5rem' }}>Motivo</th>
+                          <th style={{ padding: '0.75rem 0.5rem' }}>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {myJustifications.map(j => (
+                          <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{new Date(j.created_at).toLocaleDateString()}</td>
+                            <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j.reason}</td>
+                            <td style={{ padding: '0.75rem 0.5rem' }}>
+                              <span className={`badge ${j.status === 'Aprobado' ? 'badge-success' : 'badge-warning'}`}>{j.status}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )) : (
+                ) : (
                   <p className="text-muted">No tienes solicitudes enviadas.</p>
                 )}
               </div>
@@ -966,25 +984,45 @@ const TeacherDashboard = ({ onLogout }) => {
 
   return (
     <div className="layout">
-      <aside className="sidebar">
-        <div className="logo-container">
-          <Music2 size={32} color="var(--primary)" />
-          <div>
-            <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>J. M. Olivares</span>
-            <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Docente</span>
+      {/* Mobile Menu Button - Teacher */}
+      <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+        <Menu size={24} />
+      </button>
+
+      {/* Overlay for Mobile Sidebar */}
+      <div
+        className={`sidebar-overlay ${isSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
+
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3.5rem' }}>
+          <div className="logo-container" style={{ marginBottom: 0 }}>
+            <Music2 size={32} color="var(--primary)" />
+            <div>
+              <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>J. M. Olivares</span>
+              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Docente</span>
+            </div>
           </div>
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setIsSidebarOpen(false)}
+            style={{ display: 'flex', position: 'static', background: 'none', border: 'none', color: 'white' }}
+          >
+            <X size={24} />
+          </button>
         </div>
         <nav>
-          <a href="#" className={`nav-link ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>
+          <a href="#" className={`nav-link ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => { setActiveTab('attendance'); setIsSidebarOpen(false); }}>
             <Clock size={20} /> Asistencia
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'schedule' ? 'active' : ''}`} onClick={() => setActiveTab('schedule')}>
+          <a href="#" className={`nav-link ${activeTab === 'schedule' ? 'active' : ''}`} onClick={() => { setActiveTab('schedule'); setIsSidebarOpen(false); }}>
             <Calendar size={20} /> Próximas Clases
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'justifications' ? 'active' : ''}`} onClick={() => setActiveTab('justifications')}>
+          <a href="#" className={`nav-link ${activeTab === 'justifications' ? 'active' : ''}`} onClick={() => { setActiveTab('justifications'); setIsSidebarOpen(false); }}>
             <FileUp size={20} /> Justificaciones
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+          <a href="#" className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); setIsSidebarOpen(false); }}>
             <History size={20} /> Mi Historial
           </a>
           <div style={{ marginTop: 'auto' }}>
@@ -996,16 +1034,16 @@ const TeacherDashboard = ({ onLogout }) => {
       </aside>
 
       <main className="main-content">
-        <header style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
+        <header className="dashboard-header" style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
+          <div style={{ minWidth: '250px' }}>
             <p className="text-muted" style={{ fontWeight: 600 }}>Bienvenido de nuevo</p>
-            <h1 style={{ fontSize: '2.5rem' }}>
+            <h1 className="brand-font" style={{ fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', margin: 0 }}>
               {loading ? 'Inicializando...' :
                 teacherProfile ? `Prof. ${teacherProfile.name}` :
                   'Usuario no registrado en Personal Docente'}
             </h1>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Clock for Teacher */}
             <div className="glass" style={{
               display: 'flex',
@@ -1023,7 +1061,7 @@ const TeacherDashboard = ({ onLogout }) => {
                   {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
-                  {time.toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {time.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </span>
               </div>
             </div>
@@ -1036,15 +1074,20 @@ const TeacherDashboard = ({ onLogout }) => {
             </div>
           </div>
         </header>
-        {!teacherProfile && !loading ? (
+        {!loading && !teacherProfile ? (
           <div className="card" style={{ textAlign: 'center', padding: '4rem' }}>
             <AlertCircle size={48} className="text-warning" style={{ margin: '0 auto 1.5rem' }} />
             <h2 className="brand-font">Acceso Limitado</h2>
             <p className="text-muted" style={{ maxWidth: '500px', margin: '1rem auto' }}>
-              Tu cuenta de correo <strong>{user?.email}</strong> no está vinculada a ningún registro en la tabla de <strong>Personal Docente</strong>.
+              Tu cuenta de correo <strong>{user?.email || 'No identificado'}</strong> no está vinculada a ningún registro en la tabla de <strong>Personal Docente</strong>.
               Por favor, contacta al administrador para que te asigne una cátedra y active tu perfil.
             </p>
             <button className="btn-primary" onClick={onLogout} style={{ marginTop: '2rem' }}>Cerrar Sesión</button>
+          </div>
+        ) : loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem', gap: '1.5rem' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ width: '40px', height: '40px', border: '3px solid rgba(212,122,77,0.2)', borderTopColor: 'var(--primary)', borderRadius: '50%' }} />
+            <p className="text-muted" style={{ fontWeight: 600 }}>Cargando perfil docente...</p>
           </div>
         ) : (
           renderContent()
@@ -1053,7 +1096,7 @@ const TeacherDashboard = ({ onLogout }) => {
 
       <AnimatePresence>
         {showLogoutModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyCenter: 'center', backdropFilter: 'blur(4px)' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '400px', margin: 'auto', textAlign: 'center', padding: '2.5rem' }}>
               <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                 <LogOut size={30} className="text-terracotta" />
@@ -1096,11 +1139,11 @@ const TeacherDashboard = ({ onLogout }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 };
 
-const AdminDashboard = ({ onLogout }) => {
+const AdminDashboard = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showModal, setShowModal] = useState(false);
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
@@ -1148,6 +1191,7 @@ const AdminDashboard = ({ onLogout }) => {
   const [userRoleFilter, setUserRoleFilter] = useState('Todos');
   const [showUserRoleDropdown, setShowUserRoleDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [facultyMembers, setFacultyMembers] = useState([]);
   const [academicChairs, setAcademicChairs] = useState([]);
   const [masterSchedule, setMasterSchedule] = useState([]);
@@ -1831,7 +1875,8 @@ const AdminDashboard = ({ onLogout }) => {
       case 'dashboard':
         return (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <section className="grid-cols-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
+            {/* Metrics Grid */}
+            <section className="dashboard-stats-grid" style={{ marginBottom: '3rem' }}>
               <div className="card">
                 <p className="text-muted" style={{ fontSize: '0.875rem' }}>Asistencia Hoy</p>
                 <h2 style={{ fontSize: '2rem' }}>{dashboardStats.attendancePct}%</h2>
@@ -1856,7 +1901,7 @@ const AdminDashboard = ({ onLogout }) => {
 
             {/* Weekly Master Schedule Board - Compact Version */}
             <div className="card" style={{ marginBottom: '3rem', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h3 className="brand-font" style={{ fontSize: '1.5rem', color: 'var(--secondary)' }}>Horario Maestro Semanal</h3>
                   <p className="text-muted" style={{ fontSize: '0.85rem' }}>Vista consolidada de actividades</p>
@@ -1867,109 +1912,112 @@ const AdminDashboard = ({ onLogout }) => {
                 </div>
               </div>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(6, 1fr)',
-                gap: '0.6rem',
-                width: '100%'
-              }}>
-                {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(day => (
-                  <div key={day} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                    minWidth: 0 // Prevent grid item overflow
-                  }}>
-                    <div style={{
-                      background: 'var(--bg-cream)',
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      textAlign: 'center',
-                      border: '1px solid rgba(212, 122, 77, 0.1)',
+              <div className="table-responsive">
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, minmax(150px, 1fr))',
+                  gap: '0.6rem',
+                  width: '100%',
+                  minWidth: '900px' // Ensure enough space for the 6 columns
+                }}>
+                  {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(day => (
+                    <div key={day} style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      minWidth: 0 // Prevent grid item overflow
                     }}>
-                      <h4 style={{
-                        margin: 0,
-                        color: 'var(--secondary)',
-                        fontSize: '0.85rem',
-                        fontWeight: 900,
-                        letterSpacing: '0.5px'
-                      }}>{day}</h4>
-                    </div>
+                      <div style={{
+                        background: 'var(--bg-cream)',
+                        padding: '0.6rem',
+                        borderRadius: '10px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(212, 122, 77, 0.1)',
+                      }}>
+                        <h4 style={{
+                          margin: 0,
+                          color: 'var(--secondary)',
+                          fontSize: '0.85rem',
+                          fontWeight: 900,
+                          letterSpacing: '0.5px'
+                        }}>{day}</h4>
+                      </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {masterSchedule.filter(s => s.day === day).length > 0 ? (
-                        masterSchedule
-                          .filter(s => s.day === day)
-                          .sort((a, b) => a.time.localeCompare(b.time))
-                          .map(session => (
-                            <motion.div
-                              whileHover={{ scale: 1.02, y: -2 }}
-                              key={session.id}
-                              style={{
-                                background: 'white',
-                                padding: '0.8rem',
-                                borderRadius: '12px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                                border: '1px solid rgba(0,0,0,0.03)',
-                                borderLeft: '3px solid var(--primary)',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.15rem' }}>
-                                {session.time}
-                              </div>
-                              <h5 style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={session.chair}>
-                                {session.chair}
-                              </h5>
-                              <p className="text-muted" style={{ fontSize: '0.7rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {session.professor}
-                              </p>
-                              <div style={{
-                                marginTop: '0.5rem',
-                                paddingTop: '0.5rem',
-                                borderTop: '1px solid rgba(0,0,0,0.04)',
-                                display: 'flex',
-                                justifyContent: 'center'
-                              }}>
-                                <span style={{
-                                  fontSize: '0.65rem',
-                                  fontWeight: 700,
-                                  color: 'var(--text-muted)',
-                                  background: 'var(--bg-cream)',
-                                  padding: '1px 6px',
-                                  borderRadius: '4px'
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {masterSchedule.filter(s => s.day === day).length > 0 ? (
+                          masterSchedule
+                            .filter(s => s.day === day)
+                            .sort((a, b) => a.time.localeCompare(b.time))
+                            .map(session => (
+                              <motion.div
+                                whileHover={{ scale: 1.02, y: -2 }}
+                                key={session.id}
+                                style={{
+                                  background: 'white',
+                                  padding: '0.8rem',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                  border: '1px solid rgba(0,0,0,0.03)',
+                                  borderLeft: '3px solid var(--primary)',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.15rem' }}>
+                                  {session.time}
+                                </div>
+                                <h5 style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={session.chair}>
+                                  {session.chair}
+                                </h5>
+                                <p className="text-muted" style={{ fontSize: '0.7rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {session.professor}
+                                </p>
+                                <div style={{
+                                  marginTop: '0.5rem',
+                                  paddingTop: '0.5rem',
+                                  borderTop: '1px solid rgba(0,0,0,0.04)',
+                                  display: 'flex',
+                                  justifyContent: 'center'
                                 }}>
-                                  S. {session.room}
-                                </span>
-                              </div>
-                            </motion.div>
-                          ))
-                      ) : (
-                        <div style={{
-                          textAlign: 'center',
-                          padding: '1rem 0.5rem',
-                          borderRadius: '12px',
-                          border: '1px dashed rgba(0,0,0,0.05)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          opacity: 0.5
-                        }}>
-                          <Music size={14} />
-                          <p style={{ margin: 0, fontSize: '0.65rem', fontStyle: 'italic' }}> vacío </p>
-                        </div>
-                      )}
+                                  <span style={{
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    color: 'var(--text-muted)',
+                                    background: 'var(--bg-cream)',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px'
+                                  }}>
+                                    S. {session.room}
+                                  </span>
+                                </div>
+                              </motion.div>
+                            ))
+                        ) : (
+                          <div style={{
+                            textAlign: 'center',
+                            padding: '1rem 0.5rem',
+                            borderRadius: '12px',
+                            border: '1px dashed rgba(0,0,0,0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            opacity: 0.5
+                          }}>
+                            <Music size={14} />
+                            <p style={{ margin: 0, fontSize: '0.65rem', fontStyle: 'italic' }}> vacío </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="grid-cols-2" style={{ marginBottom: '3rem' }}>
               <div className="card">
-                <h3>Tendencia de Cumplimiento</h3>
-                <div style={{ height: '300px', marginTop: '2rem' }}>
+                <h3 style={{ marginBottom: '1.5rem' }}>Tendencia de Cumplimiento</h3>
+                <div style={{ height: '300px' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={statsData}>
                       <defs>
@@ -1987,21 +2035,23 @@ const AdminDashboard = ({ onLogout }) => {
                 </div>
               </div>
               <div className="card">
-                <h3>Distribución Docente</h3>
-                <div style={{ display: 'flex', alignItems: 'center', height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={distributionData} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                        {distributionData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div style={{ minWidth: '120px' }}>
+                <h3 style={{ marginBottom: '1.5rem' }}>Distribución Docente</h3>
+                <div style={{ display: 'flex', alignItems: 'center', height: '300px', flexWrap: 'wrap', gap: '1.5rem' }}>
+                  <div style={{ flex: '1', minWidth: '180px', height: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={distributionData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {distributionData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ minWidth: '150px' }}>
                     {distributionData.map(d => (
-                      <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <div style={{ width: '12px', height: '12px', background: d.color, borderRadius: '3px' }}></div>
-                        <span style={{ fontSize: '0.8rem' }}>{d.name}</span>
+                      <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                        <div style={{ width: '12px', height: '12px', background: d.color, borderRadius: '4px' }}></div>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{d.name}</span>
                       </div>
                     ))}
                   </div>
@@ -2022,22 +2072,20 @@ const AdminDashboard = ({ onLogout }) => {
 
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 className="brand-font" style={{ fontSize: '2rem' }}>Personal Docente</h2>
-            </div>
-
             {/* Sub-tabs for Faculty */}
-            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', borderBottom: '1px solid #eee' }}>
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2.5rem', borderBottom: '1px solid #eee', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setFacultyViewMode('list')}
                 style={{
                   padding: '1rem 0',
                   background: 'none',
                   border: 'none',
-                  borderBottom: facultyViewMode === 'list' ? '2px solid var(--secondary)' : 'none',
+                  borderBottom: facultyViewMode === 'list' ? '3px solid var(--secondary)' : '3px solid transparent',
                   color: facultyViewMode === 'list' ? 'var(--secondary)' : 'var(--text-muted)',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s'
                 }}
               >
                 Lista de Docentes
@@ -2048,10 +2096,12 @@ const AdminDashboard = ({ onLogout }) => {
                   padding: '1rem 0',
                   background: 'none',
                   border: 'none',
-                  borderBottom: facultyViewMode === 'users' ? '2px solid var(--secondary)' : 'none',
+                  borderBottom: facultyViewMode === 'users' ? '3px solid var(--secondary)' : '3px solid transparent',
                   color: facultyViewMode === 'users' ? 'var(--secondary)' : 'var(--text-muted)',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s'
                 }}
               >
                 Gestión de Usuarios
@@ -2060,7 +2110,7 @@ const AdminDashboard = ({ onLogout }) => {
 
             {facultyViewMode === 'list' ? (
               <>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                   {/* Search Bar */}
                   <div className="glass" style={{
                     display: 'flex',
@@ -2069,7 +2119,9 @@ const AdminDashboard = ({ onLogout }) => {
                     borderRadius: '16px',
                     boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
                     border: '1px solid rgba(0,0,0,0.05)',
-                    width: '300px'
+                    flex: '1',
+                    maxWidth: '400px',
+                    minWidth: '250px'
                   }}>
                     <Search size={18} className="text-forest" style={{ opacity: 0.7 }} />
                     <input
@@ -2178,171 +2230,165 @@ const AdminDashboard = ({ onLogout }) => {
                   Mostrando {filteredFaculty.length} de {facultyMembers.length} profesores
                 </p>
                 <div className="card">
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
-                        <th style={{ padding: '1rem' }}>Profesor</th>
-                        <th style={{ padding: '1rem' }}>Cátedra</th>
-                        <th style={{ padding: '1rem' }}>Entrada</th>
-                        <th style={{ padding: '1rem' }}>Salida</th>
-                        <th style={{ padding: '1rem' }}>Estado</th>
-                        <th style={{ padding: '1rem' }}>Justificado</th>
-                        <th style={{ padding: '1rem' }}>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredFaculty.map(f => (
-                        <tr key={f.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontWeight: 700 }}>{f.name}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{f.email}</div>
-                          </td>
-                          <td style={{ padding: '1rem' }}>{f.chair}</td>
-                          <td style={{ padding: '1rem', fontWeight: 600 }}>{f.entry}</td>
-                          <td style={{ padding: '1rem', fontWeight: 600 }}>{f.exit}</td>
-                          <td style={{ padding: '1rem' }}>
-                            <span className={`badge ${f.status === 'Presente' || f.status === 'A tiempo' ? 'badge-success' :
-                              f.status === 'Tarde' || f.status === 'Retraso' ? 'badge-warning' :
-                                'badge-danger'
-                              }`}>{f.status}</span>
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <span style={{
-                              color: f.justified === 'Sí' ? 'var(--success)' : f.justified === 'No' ? 'var(--danger)' : 'var(--text-muted)',
-                              fontWeight: f.justified !== '-' ? 700 : 400
-                            }}>
-                              {f.justified}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', position: 'relative' }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowActionsMenu(showActionsMenu === f.id ? null : f.id);
-                              }}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
-                            >
-                              <MoreVertical size={18} />
-                            </button>
-
-                            {showActionsMenu === f.id && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                transition={{ duration: 0.15 }}
-                                style={{
-                                  position: 'absolute',
-                                  right: '0',
-                                  top: '100%',
-                                  background: 'white',
-                                  boxShadow: '0 12px 35px rgba(0,0,0,0.15)',
-                                  borderRadius: '16px',
-                                  padding: '0.6rem',
-                                  zIndex: 1000,
-                                  minWidth: '200px',
-                                  marginTop: '0.5rem',
-                                  border: '1px solid rgba(0,0,0,0.05)'
-                                }}
-                              >
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setFacultyForm({
-                                      name: f.name,
-                                      email: f.email,
-                                      phone: f.phone,
-                                      chair: f.chair,
-                                      entry: f.entry,
-                                      exit: f.exit,
-                                      status: f.status,
-                                      justified: f.justified
-                                    });
-                                    setEditingFaculty(f);
-                                    setShowAddFacultyModal(true);
-                                    setShowActionsMenu(null);
-                                  }}
-                                  className="action-menu-item"
-                                  style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
-                                    border: 'none',
-                                    background: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    cursor: 'pointer',
-                                    borderRadius: '12px',
-                                    fontSize: '0.95rem',
-                                    fontWeight: 500,
-                                    transition: 'all 0.2s',
-                                    textAlign: 'left',
-                                    color: 'var(--text-main)'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(27, 67, 50, 0.08)';
-                                    e.currentTarget.style.transform = 'translateX(2px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'none';
-                                    e.currentTarget.style.transform = 'translateX(0)';
-                                  }}
-                                >
-                                  <Edit2 size={16} style={{ color: 'var(--secondary)' }} />
-                                  <span>Editar</span>
-                                </button>
-
-                                <div style={{
-                                  height: '1px',
-                                  background: 'rgba(0,0,0,0.06)',
-                                  margin: '0.25rem 0.5rem'
-                                }}></div>
-
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowDeleteModal(f);
-                                    setShowActionsMenu(null);
-                                  }}
-                                  className="action-menu-item"
-                                  style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
-                                    border: 'none',
-                                    background: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    cursor: 'pointer',
-                                    borderRadius: '12px',
-                                    fontSize: '0.95rem',
-                                    fontWeight: 500,
-                                    transition: 'all 0.2s',
-                                    textAlign: 'left',
-                                    color: 'var(--text-main)'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(153, 27, 27, 0.08)';
-                                    e.currentTarget.style.color = 'var(--danger)';
-                                    e.currentTarget.style.transform = 'translateX(2px)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'none';
-                                    e.currentTarget.style.color = 'var(--text-main)';
-                                    e.currentTarget.style.transform = 'translateX(0)';
-                                  }}
-                                >
-                                  <Trash2 size={16} style={{ color: 'var(--danger)' }} />
-                                  <span>Eliminar</span>
-                                </button>
-                              </motion.div>
-                            )}
-                          </td>
+                  <div className="table-responsive">
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                          <th style={{ padding: '1rem' }}>Profesor</th>
+                          <th style={{ padding: '1rem' }}>Cátedra</th>
+                          <th style={{ padding: '1rem' }}>Entrada</th>
+                          <th style={{ padding: '1rem' }}>Salida</th>
+                          <th style={{ padding: '1rem' }}>Estado</th>
+                          <th style={{ padding: '1rem' }}>Acciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredFaculty.map(f => (
+                          <tr key={f.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                            <td style={{ padding: '1rem' }}>
+                              <div style={{ fontWeight: 700 }}>{f.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{f.email}</div>
+                            </td>
+                            <td style={{ padding: '1rem' }}>{f.chair}</td>
+                            <td style={{ padding: '1rem', fontWeight: 600 }}>{f.entry}</td>
+                            <td style={{ padding: '1rem', fontWeight: 600 }}>{f.exit}</td>
+                            <td style={{ padding: '1rem' }}>
+                              <span className={`badge ${f.status === 'Presente' || f.status === 'A tiempo' ? 'badge-success' :
+                                f.status === 'Tarde' || f.status === 'Retraso' ? 'badge-warning' :
+                                  'badge-danger'
+                                }`}>{f.status}</span>
+                            </td>
+                            <td style={{ padding: '1rem', position: 'relative' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowActionsMenu(showActionsMenu === f.id ? null : f.id);
+                                }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                              >
+                                <MoreVertical size={18} />
+                              </button>
 
+                              <AnimatePresence>
+                                {showActionsMenu === f.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                    transition={{ duration: 0.15 }}
+                                    style={{
+                                      position: 'absolute',
+                                      right: '0',
+                                      top: '100%',
+                                      background: 'white',
+                                      boxShadow: '0 12px 35px rgba(0,0,0,0.15)',
+                                      borderRadius: '16px',
+                                      padding: '0.6rem',
+                                      zIndex: 1000,
+                                      minWidth: '200px',
+                                      marginTop: '0.5rem',
+                                      border: '1px solid rgba(0,0,0,0.05)'
+                                    }}
+                                  >
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFacultyForm({
+                                          name: f.name,
+                                          email: f.email,
+                                          phone: f.phone,
+                                          chair: f.chair,
+                                          entry: f.entry,
+                                          exit: f.exit,
+                                          status: f.status,
+                                          justified: f.justified
+                                        });
+                                        setEditingFaculty(f);
+                                        setShowAddFacultyModal(true);
+                                        setShowActionsMenu(null);
+                                      }}
+                                      className="action-menu-item"
+                                      style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        border: 'none',
+                                        background: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        cursor: 'pointer',
+                                        borderRadius: '12px',
+                                        fontSize: '0.95rem',
+                                        fontWeight: 500,
+                                        transition: 'all 0.2s',
+                                        textAlign: 'left',
+                                        color: 'var(--text-main)'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(27, 67, 50, 0.08)';
+                                        e.currentTarget.style.transform = 'translateX(2px)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'none';
+                                        e.currentTarget.style.transform = 'translateX(0)';
+                                      }}
+                                    >
+                                      <Edit2 size={16} style={{ color: 'var(--secondary)' }} />
+                                      <span>Editar</span>
+                                    </button>
+
+                                    <div style={{
+                                      height: '1px',
+                                      background: 'rgba(0,0,0,0.06)',
+                                      margin: '0.25rem 0.5rem'
+                                    }}></div>
+
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowDeleteModal(f);
+                                        setShowActionsMenu(null);
+                                      }}
+                                      className="action-menu-item"
+                                      style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        border: 'none',
+                                        background: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        cursor: 'pointer',
+                                        borderRadius: '12px',
+                                        fontSize: '0.95rem',
+                                        fontWeight: 500,
+                                        transition: 'all 0.2s',
+                                        textAlign: 'left',
+                                        color: 'var(--text-main)'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(153, 27, 27, 0.08)';
+                                        e.currentTarget.style.color = 'var(--danger)';
+                                        e.currentTarget.style.transform = 'translateX(2px)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'none';
+                                        e.currentTarget.style.color = 'var(--text-main)';
+                                        e.currentTarget.style.transform = 'translateX(0)';
+                                      }}
+                                    >
+                                      <Trash2 size={16} style={{ color: 'var(--danger)' }} />
+                                      <span>Eliminar</span>
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   {filteredFaculty.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                       <Users size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
@@ -2354,7 +2400,7 @@ const AdminDashboard = ({ onLogout }) => {
             ) : (
               // VISTA DE GESTIÓN DE USUARIOS
               <div className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                   <h3 style={{ margin: 0 }}>Usuarios del Sistema</h3>
                   <button
                     className="btn-primary"
@@ -2372,12 +2418,12 @@ const AdminDashboard = ({ onLogout }) => {
                       setShowAddUserModal(true);
                     }}
                   >
-                    <UserPlus size={20} /> <span>Nuevo Usuario</span>
+                    <UserPlus size={20} /> <span style={{ whiteSpace: 'nowrap' }}>Nuevo Usuario</span>
                   </button>
                 </div>
 
                 {/* User Search and Filter */}
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                   <div className="glass" style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -2385,7 +2431,8 @@ const AdminDashboard = ({ onLogout }) => {
                     borderRadius: '16px',
                     boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
                     border: '1px solid rgba(0,0,0,0.05)',
-                    flex: 1
+                    flex: '1',
+                    minWidth: '250px'
                   }}>
                     <Search size={18} className="text-forest" style={{ opacity: 0.7 }} />
                     <input
@@ -2406,7 +2453,7 @@ const AdminDashboard = ({ onLogout }) => {
                     />
                   </div>
 
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative', minWidth: '150px' }}>
                     <button
                       onClick={() => setShowUserRoleDropdown(!showUserRoleDropdown)}
                       className="glass"
@@ -2420,7 +2467,7 @@ const AdminDashboard = ({ onLogout }) => {
                         cursor: 'pointer',
                         fontWeight: 600,
                         color: 'var(--text-main)',
-                        minWidth: '150px',
+                        width: '100%',
                         justifyContent: 'space-between',
                         height: '100%'
                       }}
@@ -2487,83 +2534,82 @@ const AdminDashboard = ({ onLogout }) => {
                   </div>
                 </div>
 
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
-                      <th style={{ padding: '1rem' }}>Usuario</th>
-                      <th style={{ padding: '1rem' }}>Rol</th>
-                      <th style={{ padding: '1rem' }}>Estado</th>
-                      <th style={{ padding: '1rem' }}>Último Acceso</th>
-                      <th style={{ padding: '1rem' }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Render Admin Row if matches filters */}
-                    {('Administrador Principal'.toLowerCase().includes(userSearch.toLowerCase()) || 'admin@conservatorio.ve'.includes(userSearch.toLowerCase())) &&
-                      (userRoleFilter === 'Todos' || userRoleFilter === 'Admin') && (
-                        <tr style={{ borderBottom: '1px solid #fafafa' }}>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontWeight: 700 }}>Administrador Principal</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>admin@conservatorio.ve</div>
-                          </td>
-                          <td style={{ padding: '1rem' }}><span className="badge badge-forest">Admin</span></td>
-                          <td style={{ padding: '1rem' }}><span className="badge badge-success">Activo</span></td>
-                          <td style={{ padding: '1rem' }}>Hace 5 min</td>
-                          <td style={{ padding: '1rem' }}>-</td>
-                        </tr>
-                      )}
+                <div className="table-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                        <th style={{ padding: '1rem' }}>Usuario</th>
+                        <th style={{ padding: '1rem' }}>Rol</th>
+                        <th style={{ padding: '1rem' }}>Estado</th>
+                        <th style={{ padding: '1rem' }}>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Render Admin Row if matches filters */}
+                      {('Administrador Principal'.toLowerCase().includes(userSearch.toLowerCase()) || 'admin@conservatorio.ve'.includes(userSearch.toLowerCase())) &&
+                        (userRoleFilter === 'Todos' || userRoleFilter === 'Admin') && (
+                          <tr style={{ borderBottom: '1px solid #fafafa' }}>
+                            <td style={{ padding: '1rem' }}>
+                              <div style={{ fontWeight: 700 }}>Administrador Principal</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>admin@conservatorio.ve</div>
+                            </td>
+                            <td style={{ padding: '1rem' }}><span className="badge badge-forest">Admin</span></td>
+                            <td style={{ padding: '1rem' }}><span className="badge badge-success">Activo</span></td>
+                            <td style={{ padding: '1rem' }}>-</td>
+                          </tr>
+                        )}
 
-                    {/* Render Filtered Faculty Members */}
-                    {facultyMembers
-                      .filter(f => {
-                        const matchesSearch = f.name.toLowerCase().includes(userSearch.toLowerCase()) || f.email.toLowerCase().includes(userSearch.toLowerCase());
-                        const matchesRole = userRoleFilter === 'Todos' || userRoleFilter === 'Docente';
-                        return matchesSearch && matchesRole;
-                      })
-                      .map(f => (
-                        <tr key={f.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontWeight: 700 }}>{f.name}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{f.email}</div>
-                          </td>
-                          <td style={{ padding: '1rem' }}><span className="badge badge-forest" style={{ background: 'rgba(212, 122, 77, 0.1)', color: 'var(--primary)' }}>Docente</span></td>
-                          <td style={{ padding: '1rem' }}>
-                            <span className="badge badge-success">Activo</span>
-                          </td>
-                          <td style={{ padding: '1rem' }}>{f.entry && f.entry !== '-' ? 'Hoy ' + f.entry : 'Hace 2 días'}</td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              <button
-                                onClick={() => {
-                                  setFacultyForm({
-                                    name: f.name,
-                                    email: f.email,
-                                    phone: f.phone,
-                                    chair: f.chair,
-                                    entry: f.entry,
-                                    exit: f.exit,
-                                    status: f.status,
-                                    justified: f.justified
-                                  });
-                                  setEditingFaculty(f);
-                                  setShowAddFacultyModal(true);
-                                }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--secondary)' }} title="Editar Usuario"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => setShowDeleteModal(f)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} title="Eliminar Usuario"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+                      {/* Render Filtered Faculty Members */}
+                      {facultyMembers
+                        .filter(f => {
+                          const matchesSearch = f.name.toLowerCase().includes(userSearch.toLowerCase()) || f.email.toLowerCase().includes(userSearch.toLowerCase());
+                          const matchesRole = userRoleFilter === 'Todos' || userRoleFilter === 'Docente';
+                          return matchesSearch && matchesRole;
+                        })
+                        .map(f => (
+                          <tr key={f.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                            <td style={{ padding: '1rem' }}>
+                              <div style={{ fontWeight: 700 }}>{f.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{f.email}</div>
+                            </td>
+                            <td style={{ padding: '1rem' }}><span className="badge badge-forest" style={{ background: 'rgba(212, 122, 77, 0.1)', color: 'var(--primary)' }}>Docente</span></td>
+                            <td style={{ padding: '1rem' }}>
+                              <span className="badge badge-success">Activo</span>
+                            </td>
+                            <td style={{ padding: '1rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  onClick={() => {
+                                    setFacultyForm({
+                                      name: f.name,
+                                      email: f.email,
+                                      phone: f.phone,
+                                      chair: f.chair,
+                                      entry: f.entry,
+                                      exit: f.exit,
+                                      status: f.status,
+                                      justified: f.justified
+                                    });
+                                    setEditingFaculty(f);
+                                    setShowAddFacultyModal(true);
+                                  }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--secondary)' }} title="Editar Usuario"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setShowDeleteModal(f)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} title="Eliminar Usuario"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </motion.div>
@@ -2579,10 +2625,10 @@ const AdminDashboard = ({ onLogout }) => {
 
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 className="brand-font" style={{ fontSize: '2rem' }}>Cátedras e Instancias</h2>
 
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%', justifyContent: 'flex-end' }}>
                 {/* Search Bar for Chairs */}
                 <div className="glass" style={{
                   display: 'flex',
@@ -2591,7 +2637,9 @@ const AdminDashboard = ({ onLogout }) => {
                   borderRadius: '16px',
                   boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
                   border: '1px solid rgba(0,0,0,0.05)',
-                  width: '280px'
+                  flex: '1',
+                  maxWidth: '300px',
+                  minWidth: '200px'
                 }}>
                   <Search size={18} className="text-forest" style={{ opacity: 0.7 }} />
                   <input
@@ -2692,7 +2740,7 @@ const AdminDashboard = ({ onLogout }) => {
                   </AnimatePresence>
                 </div>
 
-                <button className="btn-primary" style={{ background: 'var(--secondary)', padding: '0.7rem 1.4rem', borderRadius: '16px' }} onClick={() => {
+                <button className="btn-primary" style={{ background: 'var(--secondary)', padding: '0.7rem 1.4rem', borderRadius: '16px', whiteSpace: 'nowrap' }} onClick={() => {
                   setEditingChair(null);
                   setChairForm({ name: '', room: '', type: 'Individual' });
                   setShowModal(true);
@@ -2703,17 +2751,18 @@ const AdminDashboard = ({ onLogout }) => {
             </div>
 
             {/* Sub-tabs for Chairs/Schedules */}
-            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', borderBottom: '1px solid #eee' }}>
+            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', borderBottom: '1px solid #eee', overflowX: 'auto', paddingBottom: '2px' }}>
               <button
                 onClick={() => setChairsViewMode('list')}
                 style={{
                   padding: '1rem 0',
                   background: 'none',
                   border: 'none',
-                  borderBottom: chairsViewMode === 'list' ? '2px solid var(--secondary)' : 'none',
+                  borderBottom: chairsViewMode === 'list' ? '3px solid var(--secondary)' : '3px solid transparent',
                   color: chairsViewMode === 'list' ? 'var(--secondary)' : 'var(--text-muted)',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 Lista de Cátedras
@@ -2724,10 +2773,11 @@ const AdminDashboard = ({ onLogout }) => {
                   padding: '1rem 0',
                   background: 'none',
                   border: 'none',
-                  borderBottom: chairsViewMode === 'schedule' ? '2px solid var(--secondary)' : 'none',
+                  borderBottom: chairsViewMode === 'schedule' ? '3px solid var(--secondary)' : '3px solid transparent',
                   color: chairsViewMode === 'schedule' ? 'var(--secondary)' : 'var(--text-muted)',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 Horarios Asignados
@@ -2735,14 +2785,14 @@ const AdminDashboard = ({ onLogout }) => {
             </div>
 
             {chairsViewMode === 'list' ? (
-              <div className="grid-cols-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+              <div className="grid-cols-2">
                 {filteredChairs.map(c => (
-                  <div key={c.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
-                    <div>
+                  <div key={c.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
                       <span className="badge" style={{ background: '#eee', marginBottom: '0.5rem' }}>Salón {c.room}</span>
                       <h3 style={{ fontSize: '1.25rem' }}>{c.name}</h3>
                       <p className="text-muted" style={{ fontSize: '0.85rem' }}>Modalidad: {c.type}</p>
-                      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => {
                             setEditingChair(c);
@@ -2769,7 +2819,7 @@ const AdminDashboard = ({ onLogout }) => {
                   </div>
                 ))}
                 {filteredChairs.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', gridColumn: 'span 2' }}>
+                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
                     <GraduationCap size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
                     <p>No se encontraron cátedras con estos filtros</p>
                   </div>
@@ -2777,49 +2827,51 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
             ) : (
               <div className="card" style={{ padding: '0' }}>
-                <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee' }}>
-                  <h3 style={{ fontSize: '1.2rem' }}>Distribución de Horarios</h3>
+                <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Distribución de Horarios</h3>
                   <button
                     className="btn-primary"
                     style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', borderRadius: '12px' }}
                     onClick={() => setShowAddScheduleModal(true)}
                   >
-                    <Plus size={16} /> Asignar Nuevo Horario
+                    <Plus size={16} /> <span style={{ whiteSpace: 'nowrap' }}>Asignar Nuevo Horario</span>
                   </button>
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
-                      <th style={{ padding: '1.5rem' }}>Profesor</th>
-                      <th style={{ padding: '1.5rem' }}>Cátedra</th>
-                      <th style={{ padding: '1.5rem' }}>Día</th>
-                      <th style={{ padding: '1.5rem' }}>Hora</th>
-                      <th style={{ padding: '1.5rem' }}>Salón</th>
-                      <th style={{ padding: '1.5rem' }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {masterSchedule.map(item => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                        <td style={{ padding: '1.25rem 1.5rem', fontWeight: 700 }}>{item.professor}</td>
-                        <td style={{ padding: '1.25rem 1.5rem' }}>{item.chair}</td>
-                        <td style={{ padding: '1.25rem 1.5rem' }}>
-                          <span className="badge" style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>{item.day}</span>
-                        </td>
-                        <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600 }}>{item.time}</td>
-                        <td style={{ padding: '1.25rem 1.5rem' }}>{item.room}</td>
-                        <td style={{ padding: '1.25rem 1.5rem' }}>
-                          <button
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
-                            onClick={() => handleDeleteAssignment(item.id)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+                <div className="table-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                        <th style={{ padding: '1.5rem' }}>Profesor</th>
+                        <th style={{ padding: '1.5rem' }}>Cátedra</th>
+                        <th style={{ padding: '1.5rem' }}>Día</th>
+                        <th style={{ padding: '1.5rem' }}>Hora</th>
+                        <th style={{ padding: '1.5rem' }}>Salón</th>
+                        <th style={{ padding: '1.5rem' }}>Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {masterSchedule.map(item => (
+                        <tr key={item.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                          <td style={{ padding: '1.25rem 1.5rem', fontWeight: 700 }}>{item.professor}</td>
+                          <td style={{ padding: '1.25rem 1.5rem' }}>{item.chair}</td>
+                          <td style={{ padding: '1.25rem 1.5rem' }}>
+                            <span className="badge" style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>{item.day}</span>
+                          </td>
+                          <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600 }}>{item.time}</td>
+                          <td style={{ padding: '1.25rem 1.5rem' }}>{item.room}</td>
+                          <td style={{ padding: '1.25rem 1.5rem' }}>
+                            <button
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
+                              onClick={() => handleDeleteAssignment(item.id)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </motion.div>
@@ -2827,7 +2879,7 @@ const AdminDashboard = ({ onLogout }) => {
       case 'reports':
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 className="brand-font" style={{ fontSize: '2rem' }}>Reportes Mensuales</h2>
               <button
                 className="btn-primary"
@@ -2842,7 +2894,7 @@ const AdminDashboard = ({ onLogout }) => {
                 }}
                 onClick={() => generatePDF('Anual_2025')}
               >
-                <Download size={20} /> <span style={{ fontWeight: 700 }}>Exportar Reporte Anual</span>
+                <Download size={20} /> <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Exportar Reporte Anual</span>
               </button>
             </div>
             <div className="grid-cols-3">
@@ -2888,72 +2940,74 @@ const AdminDashboard = ({ onLogout }) => {
       case 'justifications':
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 className="brand-font" style={{ fontSize: '2rem' }}>Gestión de Justificaciones</h2>
               <div className="badge badge-warning" style={{ padding: '0.6rem 1.2rem', fontSize: '0.9rem' }}>
-                {justificationsList.filter(j => j.status === 'Pendiente').length} Pendientes de Revisión
+                {justificationsList.filter(j => j.status === 'Pendiente').length} Pendientes
               </div>
             </div>
 
             <div className="card" style={{ padding: '0' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
-                    <th style={{ padding: '1.5rem' }}>Profesor</th>
-                    <th style={{ padding: '1.5rem' }}>Fecha Ausencia</th>
-                    <th style={{ padding: '1.5rem' }}>Motivo / Razón</th>
-                    <th style={{ padding: '1.5rem' }}>Documento</th>
-                    <th style={{ padding: '1.5rem' }}>Estado</th>
-                    <th style={{ padding: '1.5rem' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {justificationsList.map(j => (
-                    <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                      <td style={{ padding: '1.5rem' }}>
-                        <div style={{ fontWeight: 700 }}>{j.professor}</div>
-                      </td>
-                      <td style={{ padding: '1.5rem', fontWeight: 600 }}>{j.date}</td>
-                      <td style={{ padding: '1.5rem', maxWidth: '300px' }}>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', opacity: 0.8 }}>{j.reason}</div>
-                      </td>
-                      <td style={{ padding: '1.5rem' }}>
-                        <button className="btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <FileUp size={14} /> Ver Adjunto
-                        </button>
-                      </td>
-                      <td style={{ padding: '1.5rem' }}>
-                        <span className={`badge ${j.status === 'Aprobado' ? 'badge-success' :
-                          j.status === 'Rechazado' ? 'badge-danger' :
-                            'badge-warning'
-                          }`}>{j.status}</span>
-                      </td>
-                      <td style={{ padding: '1.5rem' }}>
-                        {j.status === 'Pendiente' ? (
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                              onClick={() => handleJustificationStatus(j.id, 'Aprobado')}
-                              style={{ background: '#1B4332', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '8px', cursor: 'pointer' }}
-                              title="Aprobar"
-                            >
-                              <CheckCircle2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleJustificationStatus(j.id, 'Rechazado')}
-                              style={{ background: '#991B1B', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '8px', cursor: 'pointer' }}
-                              title="Rechazar"
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 500 }}>Procesada</span>
-                        )}
-                      </td>
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                      <th style={{ padding: '1.5rem' }}>Profesor</th>
+                      <th style={{ padding: '1.5rem' }}>Fecha</th>
+                      <th style={{ padding: '1.5rem' }}>Motivo</th>
+                      <th style={{ padding: '1.5rem' }}>Adjunto</th>
+                      <th style={{ padding: '1.5rem' }}>Estado</th>
+                      <th style={{ padding: '1.5rem' }}>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {justificationsList.map(j => (
+                      <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                        <td style={{ padding: '1.5rem' }}>
+                          <div style={{ fontWeight: 700 }}>{j.professor}</div>
+                        </td>
+                        <td style={{ padding: '1.5rem', fontWeight: 600 }}>{j.date}</td>
+                        <td style={{ padding: '1.5rem', maxWidth: '300px' }}>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', opacity: 0.8 }}>{j.reason}</div>
+                        </td>
+                        <td style={{ padding: '1.5rem' }}>
+                          <button className="btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FileUp size={14} /> Ver
+                          </button>
+                        </td>
+                        <td style={{ padding: '1.5rem' }}>
+                          <span className={`badge ${j.status === 'Aprobada' || j.status === 'Aprobado' ? 'badge-success' :
+                            j.status === 'Rechazada' || j.status === 'Rechazado' ? 'badge-danger' :
+                              'badge-warning'
+                            }`}>{j.status}</span>
+                        </td>
+                        <td style={{ padding: '1.5rem' }}>
+                          {j.status === 'Pendiente' ? (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => handleJustificationStatus(j.id, 'Aprobada')}
+                                style={{ background: '#1B4332', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '8px', cursor: 'pointer' }}
+                                title="Aprobar"
+                              >
+                                <CheckCircle2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleJustificationStatus(j.id, 'Rechazada')}
+                                style={{ background: '#991B1B', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '8px', cursor: 'pointer' }}
+                                title="Rechazar"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '0.85rem', fontWeight: 500 }}>Procesada</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {justificationsList.length === 0 && (
@@ -2968,8 +3022,8 @@ const AdminDashboard = ({ onLogout }) => {
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="brand-font" style={{ fontSize: '2rem', marginBottom: '2rem' }}>Configuración del Sistema</h2>
-            <div className="grid-cols-2" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 2fr', gap: '2rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="settings-layout" style={{ gap: '2rem' }}>
+              <div className="settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {[
                   { id: 'General', icon: <Globe size={18} /> },
                   { id: 'Notificaciones', icon: <BellRing size={18} /> },
@@ -2993,12 +3047,12 @@ const AdminDashboard = ({ onLogout }) => {
                     }}
                   >
                     {item.icon}
-                    {item.id}
+                    <span style={{ fontWeight: 600 }}>{item.id}</span>
                   </button>
                 ))}
               </div>
 
-              <div className="card" style={{ padding: '2.5rem' }}>
+              <div className="card settings-content-card" style={{ padding: '2.5rem' }}>
                 <AnimatePresence mode="wait">
                   {settingsTab === 'General' && (
                     <motion.div
@@ -3060,8 +3114,8 @@ const AdminDashboard = ({ onLogout }) => {
 
                       <div className="card" style={{ padding: '1.5rem', marginBottom: '1rem', border: '1px solid rgba(0,0,0,0.05)' }}>
                         <h4 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>Inasistencias y Retrasos</h4>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                          <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', gap: '1rem' }}>
+                          <div style={{ flex: 1 }}>
                             <p style={{ fontWeight: 600 }}>Alertas Inmediatas</p>
                             <p className="text-muted" style={{ fontSize: '0.85rem' }}>Recibir un email cuando un profesor marque "Tarde" o no llegue.</p>
                           </div>
@@ -3069,26 +3123,26 @@ const AdminDashboard = ({ onLogout }) => {
                             type="checkbox"
                             checked={systemSettings.notificationsEnabled}
                             onChange={(e) => setSystemSettings({ ...systemSettings, notificationsEnabled: e.target.checked })}
-                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)' }}
+                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)', flexShrink: 0 }}
                           />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                          <div style={{ flex: 1 }}>
                             <p style={{ fontWeight: 600 }}>Resumen Semanal</p>
                             <p className="text-muted" style={{ fontSize: '0.85rem' }}>Reporte de estadísticas enviado los viernes.</p>
                           </div>
-                          <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)' }} />
+                          <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)', flexShrink: 0 }} />
                         </div>
                       </div>
 
                       <div className="card" style={{ padding: '1.5rem', border: '1px solid rgba(0,0,0,0.05)' }}>
                         <h4 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>Sistema</h4>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                          <div style={{ flex: 1 }}>
                             <p style={{ fontWeight: 600 }}>Mantenimiento</p>
                             <p className="text-muted" style={{ fontSize: '0.85rem' }}>Avisos sobre actualizaciones del sistema.</p>
                           </div>
-                          <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)' }} />
+                          <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)', flexShrink: 0 }} />
                         </div>
                       </div>
                     </motion.div>
@@ -3117,7 +3171,7 @@ const AdminDashboard = ({ onLogout }) => {
                         </div>
                         <button
                           className="btn-primary"
-                          style={{ marginTop: '1rem' }}
+                          style={{ marginTop: '1rem', width: '100%' }}
                           onClick={async () => {
                             const newPass = document.getElementById('newPass').value;
                             const confirmPass = document.getElementById('confirmPass').value;
@@ -3152,11 +3206,11 @@ const AdminDashboard = ({ onLogout }) => {
                         <Smartphone size={20} className="text-forest" /> Dispositivos Conectados
                       </h3>
 
-                      <div className="card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', border: '1px solid var(--success)', background: 'rgba(27, 67, 50, 0.02)' }}>
+                      <div className="card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', border: '1px solid var(--success)', background: 'rgba(27, 67, 50, 0.02)', flexWrap: 'wrap' }}>
                         <div style={{ padding: '1rem', background: 'white', borderRadius: '50%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                           <Globe size={32} className="text-forest" />
                         </div>
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
                           <h4 style={{ marginBottom: '0.25rem' }}>Sesión Actual</h4>
                           <p className="text-muted" style={{ fontSize: '0.9rem' }}>
                             {navigator.userAgent.includes("Windows") ? "Windows PC" : "Dispositivo"} - {navigator.userAgent.includes("Chrome") ? "Google Chrome" : "Navegador Web"}
@@ -3166,7 +3220,7 @@ const AdminDashboard = ({ onLogout }) => {
                             <span style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: 600 }}>Activo ahora</span>
                           </div>
                         </div>
-                        <button className="btn-outline" style={{ fontSize: '0.85rem' }} disabled>
+                        <button className="btn-outline" style={{ fontSize: '0.85rem', width: '100%' }} disabled>
                           Dispositivo Actual
                         </button>
                       </div>
@@ -3180,17 +3234,17 @@ const AdminDashboard = ({ onLogout }) => {
                   )}
                 </AnimatePresence>
 
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid rgba(0,0,0,0.05)', flexWrap: 'wrap' }}>
                   <button
                     className="btn-primary"
-                    style={{ background: 'var(--secondary)', flex: 1 }}
+                    style={{ background: 'var(--secondary)', flex: 1, minWidth: '150px' }}
                     onClick={handleSaveSettings}
                   >
                     <Save size={18} /> Guardar Cambios
                   </button>
                   <button
                     className="btn-outline"
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, minWidth: '150px' }}
                     onClick={() => {
                       if (confirm('¿Deseas restaurar los valores por defecto?')) {
                         setSystemSettings({
@@ -3216,31 +3270,51 @@ const AdminDashboard = ({ onLogout }) => {
 
   return (
     <div className="layout">
-      <aside className="sidebar" style={{ background: 'var(--secondary)' }}>
-        <div className="logo-container">
-          <Music2 size={32} color="var(--primary)" />
-          <div>
-            <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>J. M. Olivares</span>
-            <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Administrador</span>
+      {/* Mobile Menu Button - Admin */}
+      <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+        <Menu size={24} />
+      </button>
+
+      {/* Overlay for Mobile Sidebar */}
+      <div
+        className={`sidebar-overlay ${isSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
+
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`} style={{ background: 'var(--secondary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3.5rem' }}>
+          <div className="logo-container" style={{ marginBottom: 0 }}>
+            <Music2 size={32} color="var(--primary)" />
+            <div>
+              <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>J. M. Olivares</span>
+              <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Administrador</span>
+            </div>
           </div>
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setIsSidebarOpen(false)}
+            style={{ display: 'flex', position: 'static', background: 'none', border: 'none', color: 'white' }}
+          >
+            <X size={24} />
+          </button>
         </div>
         <nav>
-          <a href="#" className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+          <a href="#" className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }}>
             <LayoutDashboard size={20} /> Resumen
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'faculty' ? 'active' : ''}`} onClick={() => setActiveTab('faculty')}>
+          <a href="#" className={`nav-link ${activeTab === 'faculty' ? 'active' : ''}`} onClick={() => { setActiveTab('faculty'); setIsSidebarOpen(false); }}>
             <Users size={20} /> Personal Docente
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'chairs' ? 'active' : ''}`} onClick={() => setActiveTab('chairs')}>
+          <a href="#" className={`nav-link ${activeTab === 'chairs' ? 'active' : ''}`} onClick={() => { setActiveTab('chairs'); setIsSidebarOpen(false); }}>
             <GraduationCap size={20} /> Cátedras / Horas
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+          <a href="#" className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => { setActiveTab('reports'); setIsSidebarOpen(false); }}>
             <FileBox size={20} /> Reportes
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'justifications' ? 'active' : ''}`} onClick={() => setActiveTab('justifications')}>
+          <a href="#" className={`nav-link ${activeTab === 'justifications' ? 'active' : ''}`} onClick={() => { setActiveTab('justifications'); setIsSidebarOpen(false); }}>
             <ClipboardCheck size={20} /> Justificaciones
           </a>
-          <a href="#" className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+          <a href="#" className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}>
             <Settings size={20} /> Configuración
           </a>
           <div style={{ marginTop: 'auto' }}>
@@ -3250,9 +3324,9 @@ const AdminDashboard = ({ onLogout }) => {
       </aside>
 
       <main className="main-content">
-        <header style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ fontSize: '2.5rem' }}>
+        <header className="dashboard-header" style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
+          <div style={{ minWidth: '250px' }}>
+            <h1 className="brand-font" style={{ fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', margin: 0 }}>
               {activeTab === 'dashboard' ? 'Control de Asistencia' :
                 activeTab === 'faculty' ? 'Personal Docente' :
                   activeTab === 'chairs' ? 'Cátedras / Horas' :
@@ -3263,7 +3337,7 @@ const AdminDashboard = ({ onLogout }) => {
             </h1>
             <p className="text-muted">Dirección Académica • Gestión General</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Clock for Admin */}
             <div className="glass" style={{
               display: 'flex',
@@ -3272,7 +3346,8 @@ const AdminDashboard = ({ onLogout }) => {
               padding: '0.75rem 1.25rem',
               borderRadius: '14px',
               border: '1px solid rgba(0,0,0,0.05)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+              background: 'rgba(255,255,255,0.4)'
             }}>
               <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
@@ -4197,7 +4272,7 @@ const AdminDashboard = ({ onLogout }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 };
 
@@ -4250,8 +4325,8 @@ function App() {
   return (
     <AnimatePresence mode="wait">
       {view === 'login' && <LoginPage key="login" onLogin={handleLogin} />}
-      {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} />}
-      {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} />}
+      {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} />}
+      {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} user={user} />}
     </AnimatePresence>
   );
 }
