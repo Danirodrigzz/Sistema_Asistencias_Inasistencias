@@ -27,6 +27,12 @@
   --sidebar-width: 280px;
 }
 
+.clock-display {
+  font-family: 'Outfit', sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -448,6 +454,9 @@ select {
 
   .clock-display {
     font-size: 3rem;
+    font-family: 'Outfit', sans-serif !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -1px;
   }
 
   .btn-primary,

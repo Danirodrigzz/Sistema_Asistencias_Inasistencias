@@ -481,7 +481,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   body: JSON.stringify({
                     teacherName: teacherProfile.name,
                     status: 'Tarde',
-                    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+                    time: formatTime12h(now).split(' ').slice(0, 1)[0].split(':').slice(0, 2).join(':') + ' ' + formatTime12h(now).split(' ').slice(1).join(' '),
                     details: statusReason
                   })
                 }).then(res => res.json())
@@ -545,7 +545,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <p style={{ textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.875rem', marginBottom: '1rem' }}>
                   Hora del Servidor
                 </p>
-                <h2 className="clock-display" style={{ fontFamily: "'Outfit', sans-serif !important" }}>
+                <h2 className="clock-display" style={{ fontFamily: "'Outfit', sans-serif" }}>
                   {formatTime12h(time)}
                 </h2>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
@@ -1311,8 +1311,8 @@ const AdminDashboard = ({ onLogout, user }) => {
         const att = (todayAttendance || []).find(a => a.faculty_id === f.id);
         return {
           ...f,
-          entry: att ? new Date(att.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
-          exit: att?.check_out ? new Date(att.check_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
+          entry: att ? formatTime12h(new Date(att.check_in)).split(' ').slice(0, 1)[0].split(':').slice(0, 2).join(':') + ' ' + formatTime12h(new Date(att.check_in)).split(' ').slice(1).join(' ') : '-',
+          exit: att?.check_out ? formatTime12h(new Date(att.check_out)).split(' ').slice(0, 1)[0].split(':').slice(0, 2).join(':') + ' ' + formatTime12h(new Date(att.check_out)).split(' ').slice(1).join(' ') : '-',
           status: att ? att.status : 'Ausente'
         };
       });
