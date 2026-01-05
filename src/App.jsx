@@ -858,7 +858,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="brand-font" style={{ fontSize: '2rem', marginBottom: '2rem' }}>Mis Justificaciones</h2>
-            <div className="grid-cols-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+            <div className="grid-cols-2" style={{ gap: '2rem' }}>
               <div className="card">
                 <h3 style={{ marginBottom: '1.5rem' }}>Nueva Solicitud</h3>
                 <div className="input-group">
@@ -964,7 +964,9 @@ const TeacherDashboard = ({ onLogout, user }) => {
                             <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{new Date(j.created_at).toLocaleDateString()}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j.reason}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }}>
-                              <span className={`badge ${j.status === 'Aprobado' ? 'badge-success' : 'badge-warning'}`}>{j.status}</span>
+                              <span className={`badge ${j.status.toLowerCase().includes('aprob') ? 'badge-success' :
+                                j.status.toLowerCase().includes('rechaz') ? 'badge-danger' :
+                                  'badge-warning'}`}>{j.status}</span>
                             </td>
                           </tr>
                         ))}
@@ -1096,16 +1098,16 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
       <AnimatePresence>
         {showLogoutModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '400px', margin: 'auto', textAlign: 'center', padding: '2.5rem' }}>
-              <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                <LogOut size={30} className="text-terracotta" />
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '440px', width: '90%', margin: 'auto', textAlign: 'center', padding: '2.5rem', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}>
+              <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '70px', height: '70px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                <LogOut size={32} className="text-terracotta" />
               </div>
               <h3 className="brand-font" style={{ fontSize: '1.75rem', marginBottom: '1rem' }}>¿Cerrar Sesión?</h3>
-              <p className="text-muted" style={{ marginBottom: '2rem' }}>Asegúrate de haber marcado tu salida antes de retirarte.</p>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={onLogout}>Salir</button>
-                <button className="btn-outline" style={{ flex: 1 }} onClick={() => setShowLogoutModal(false)}>Cancelar</button>
+              <p className="text-muted" style={{ marginBottom: '2rem' }}>Asegúrate de haber marcado tu salida antes de retirarte del sistema.</p>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button className="btn-primary" style={{ flex: 1, minWidth: '120px' }} onClick={onLogout}>Cerrar Sesión</button>
+                <button className="btn-outline" style={{ flex: 1, minWidth: '120px' }} onClick={() => setShowLogoutModal(false)}>Cancelar</button>
               </div>
             </motion.div>
           </div>
@@ -2976,8 +2978,8 @@ const AdminDashboard = ({ onLogout, user }) => {
                           </button>
                         </td>
                         <td style={{ padding: '1.5rem' }}>
-                          <span className={`badge ${j.status === 'Aprobada' || j.status === 'Aprobado' ? 'badge-success' :
-                            j.status === 'Rechazada' || j.status === 'Rechazado' ? 'badge-danger' :
+                          <span className={`badge ${j.status.toLowerCase().includes('aprob') ? 'badge-success' :
+                            j.status.toLowerCase().includes('rechaz') ? 'badge-danger' :
                               'badge-warning'
                             }`}>{j.status}</span>
                         </td>
@@ -3013,7 +3015,7 @@ const AdminDashboard = ({ onLogout, user }) => {
             {justificationsList.length === 0 && (
               <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
                 <ClipboardCheck size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-                <p>No hay solicitudes de justificación registradas</p>
+                <p>No hay solicitudes de justificación registradas en el sistema</p>
               </div>
             )}
           </motion.div>
@@ -3351,7 +3353,7 @@ const AdminDashboard = ({ onLogout, user }) => {
             }}>
               <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
-                <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1 }}>
+                <span style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
                   {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
@@ -3956,19 +3958,19 @@ const AdminDashboard = ({ onLogout, user }) => {
 
       <AnimatePresence>
         {showLogoutModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowLogoutModal(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '400px', margin: 'auto', textAlign: 'center', padding: '2.5rem' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                <LogOut size={30} style={{ color: 'var(--primary)' }} />
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }} onClick={() => setShowLogoutModal(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '440px', width: '90%', margin: 'auto', textAlign: 'center', padding: '2.5rem', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '70px', height: '70px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                <LogOut size={32} style={{ color: 'var(--primary)' }} />
               </div>
               <h3 className="brand-font" style={{ fontSize: '1.75rem', marginBottom: '1rem' }}>¿Cerrar Sesión?</h3>
               <p className="text-muted" style={{ marginBottom: '2rem', fontSize: '1rem' }}>
-                ¿Estás seguro de que deseas salir del panel de administración?
+                ¿Estás seguro de que deseas salir del panel de administración? Asegúrate de haber guardado tus cambios.
               </p>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button className="btn-outline" style={{ flex: 1 }} onClick={() => setShowLogoutModal(false)}>Cancelar</button>
-                <button className="btn-primary" style={{ flex: 1, background: 'var(--secondary)' }} onClick={onLogout}>
-                  Confirmar
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button className="btn-outline" style={{ flex: 1, minWidth: '120px' }} onClick={() => setShowLogoutModal(false)}>Cancelar</button>
+                <button className="btn-primary" style={{ flex: 1, minWidth: '120px', background: 'var(--secondary)' }} onClick={onLogout}>
+                  Confirmar Salida
                 </button>
               </div>
             </motion.div>
