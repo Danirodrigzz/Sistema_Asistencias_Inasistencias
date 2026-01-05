@@ -371,11 +371,11 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
       const formattedHistory = (attendance || []).map(a => ({
         id: a.id,
-        date: new Date(a.check_in).toLocaleDateString(),
+        date: a.check_in ? new Date(a.check_in).toLocaleDateString('es-VE') : '-',
         chair: 'Clase Registrada',
-        entry: new Date(a.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        entry: a.check_in ? new Date(a.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
         exit: a.check_out ? new Date(a.check_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
-        status: a.status
+        status: a.status || 'Pendiente'
       }));
       setMyAttendance(formattedHistory);
 
@@ -707,7 +707,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   <tbody>
                     {filteredHistory.map(h => (
                       <tr key={h.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                        <td style={{ padding: '1rem', fontWeight: 600 }}>{new Date(h.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                        <td style={{ padding: '1rem', fontWeight: 600 }}>{h.date}</td>
                         <td style={{ padding: '1rem' }}>{h.chair}</td>
                         <td style={{ padding: '1rem', fontWeight: 700 }}>{h.entry}</td>
                         <td style={{ padding: '1rem', fontWeight: 700 }}>{h.exit}</td>
@@ -961,12 +961,12 @@ const TeacherDashboard = ({ onLogout, user }) => {
                       <tbody>
                         {(myJustifications || []).map(j => (
                           <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{new Date(j.created_at).toLocaleDateString()}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{j.created_at ? new Date(j.created_at).toLocaleDateString('es-VE') : (j.date || '-')}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j.reason}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }}>
-                              <span className={`badge ${j.status.toLowerCase().includes('aprob') ? 'badge-success' :
-                                j.status.toLowerCase().includes('rechaz') ? 'badge-danger' :
-                                  'badge-warning'}`}>{j.status}</span>
+                              <span className={`badge ${(j.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
+                                (j.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
+                                  'badge-warning'}`}>{j.status || 'Pendiente'}</span>
                             </td>
                           </tr>
                         ))}
@@ -2978,10 +2978,10 @@ const AdminDashboard = ({ onLogout, user }) => {
                           </button>
                         </td>
                         <td style={{ padding: '1.5rem' }}>
-                          <span className={`badge ${j.status.toLowerCase().includes('aprob') ? 'badge-success' :
-                            j.status.toLowerCase().includes('rechaz') ? 'badge-danger' :
+                          <span className={`badge ${(j.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
+                            (j.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
                               'badge-warning'
-                            }`}>{j.status}</span>
+                            }`}>{j.status || 'Pendiente'}</span>
                         </td>
                         <td style={{ padding: '1.5rem' }}>
                           {j.status === 'Pendiente' ? (
