@@ -110,6 +110,30 @@ const initialAcademicChairs = [
   { id: 4, name: 'Orquesta de Niños', room: 'Auditorio', type: 'Grupal', faculty: 2, students: 60 },
 ];
 
+// Helper: Foolproof 12h clock formatter
+const formatTime12h = (date) => {
+  if (!date || isNaN(date.getTime())) return "00:00:00 --";
+  let h = date.getHours();
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+  const ampm = h >= 12 ? 'p.m.' : 'a.m.';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${String(h).padStart(2, '0')}:${m}:${s} ${ampm}`;
+};
+
+// Helper: Safe date formatter
+const formatDateVE = (isoStr) => {
+  if (!isoStr) return "-";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    return d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch (e) {
+    return isoStr;
+  }
+};
+
 // --- Components ---
 
 const LoginPage = ({ onLogin }) => {
@@ -371,11 +395,11 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
       const formattedHistory = (attendance || []).map(a => ({
         id: a.id,
-        date: a.check_in ? new Date(a.check_in).toLocaleDateString('es-VE') : '-',
+        date: formatDateVE(a.check_in),
         chair: 'Clase Registrada',
-        entry: a.check_in ? new Date(a.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
-        exit: a.check_out ? new Date(a.check_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
-        status: a.status || 'Pendiente'
+        entry: a.check_in ? formatTime12h(new Date(a.check_in)).replace(/:[0-9]{2} /, ' ') : '-',
+        exit: a.check_out ? formatTime12h(new Date(a.check_out)).replace(/:[0-9]{2} /, ' ') : '-',
+        status: a.status || 'Presente'
       }));
       setMyAttendance(formattedHistory);
 
@@ -482,7 +506,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
         ]);
         if (error) throw error;
         setIsCheckedIn(true);
-        showNotification(`Entrada marcada: ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - Estado: ${status}`);
+        showNotification(`Entrada marcada: ${formatTime12h(now).replace(/:[0-9]{2} /, ' ')} - Estado: ${status}`);
       } else {
         const { error } = await supabase
           .from('attendance')
@@ -492,7 +516,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
         if (error) throw error;
         setIsCheckedIn(false);
-        showNotification(`Salida marcada: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);
+        showNotification(`Salida marcada: ${formatTime12h(new Date()).replace(/:[0-9]{2} /, ' ')}`);
       }
       fetchTeacherData();
     } catch (error) {
@@ -521,8 +545,8 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <p style={{ textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.875rem', marginBottom: '1rem' }}>
                   Hora del Servidor
                 </p>
-                <h2 className="clock-display">
-                  {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                <h2 className="clock-display" style={{ fontFamily: "'Outfit', sans-serif !important" }}>
+                  {formatTime12h(time)}
                 </h2>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
                   {!isCheckedIn ? (
@@ -856,7 +880,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
         );
       case 'justifications':
         return (
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+          <div style={{ paddingBottom: '2rem' }}>
             <h2 className="brand-font" style={{ fontSize: '2rem', marginBottom: '2rem' }}>Mis Justificaciones</h2>
             <div className="grid-cols-2" style={{ gap: '2rem' }}>
               <div className="card">
@@ -909,7 +933,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                             border: '1px solid rgba(0,0,0,0.05)'
                           }}
                         >
-                          {Array.from(new Set((mySchedule || []).map(s => s.chair).filter(Boolean))).map(c => (
+                          {Array.from(new Set((mySchedule || []).map(s => s?.chair).filter(Boolean))).map(c => (
                             <button
                               key={c}
                               onClick={() => {
@@ -948,7 +972,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
               </div>
               <div className="card">
                 <h3 style={{ marginBottom: '1.5rem' }}>Estados de Trámite</h3>
-                {myJustifications.length > 0 ? (
+                {(myJustifications && myJustifications.length > 0) ? (
                   <div className="table-responsive">
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
@@ -959,14 +983,14 @@ const TeacherDashboard = ({ onLogout, user }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {(myJustifications || []).map(j => (
-                          <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{j.created_at ? new Date(j.created_at).toLocaleDateString('es-VE') : (j.date || '-')}</td>
-                            <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j.reason}</td>
+                        {myJustifications.map(j => (
+                          <tr key={j?.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{j?.created_at ? formatDateVE(j.created_at) : (j?.date || '-')}</td>
+                            <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j?.reason || '-'}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }}>
-                              <span className={`badge ${(j.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
-                                (j.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
-                                  'badge-warning'}`}>{j.status || 'Pendiente'}</span>
+                              <span className={`badge ${(j?.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
+                                (j?.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
+                                  'badge-warning'}`}>{j?.status || 'Pendiente'}</span>
                             </td>
                           </tr>
                         ))}
@@ -978,7 +1002,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 )}
               </div>
             </div>
-          </motion.div>
+          </div>
         );
       default: return null;
     }
@@ -1060,7 +1084,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
               <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
-                  {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                  {formatTime12h(time)}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                   {time.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
@@ -3354,7 +3378,7 @@ const AdminDashboard = ({ onLogout, user }) => {
               <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
-                  {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                  {formatTime12h(currentTime)}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                   {currentTime.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
