@@ -112,14 +112,24 @@ const initialAcademicChairs = [
 
 // Helper: Foolproof 12h clock formatter
 const formatTime12h = (date) => {
-  if (!date || isNaN(date.getTime())) return "00:00:00 --";
-  let h = date.getHours();
-  const m = String(date.getMinutes()).padStart(2, '0');
-  const s = String(date.getSeconds()).padStart(2, '0');
+  if (!date) return "00:00:00 --";
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "00:00:00 --";
+
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
   const ampm = h >= 12 ? 'p.m.' : 'a.m.';
-  h = h % 12;
-  h = h ? h : 12;
+  h = h % 12 || 12;
   return `${String(h).padStart(2, '0')}:${m}:${s} ${ampm}`;
+};
+
+const formatTime12hShort = (date) => {
+  const t = formatTime12h(date);
+  if (t.includes('--')) return '-';
+  const parts = t.split(' ');
+  const timeParts = parts[0].split(':');
+  return `${timeParts[0]}:${timeParts[1]} ${parts[1]}`;
 };
 
 // Helper: Safe date formatter
@@ -397,8 +407,8 @@ const TeacherDashboard = ({ onLogout, user }) => {
         id: a.id,
         date: formatDateVE(a.check_in),
         chair: 'Clase Registrada',
-        entry: a.check_in ? formatTime12h(new Date(a.check_in)).replace(/:[0-9]{2} /, ' ') : '-',
-        exit: a.check_out ? formatTime12h(new Date(a.check_out)).replace(/:[0-9]{2} /, ' ') : '-',
+        entry: formatTime12hShort(a.check_in),
+        exit: formatTime12hShort(a.check_out),
         status: a.status || 'Presente'
       }));
       setMyAttendance(formattedHistory);
@@ -481,7 +491,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   body: JSON.stringify({
                     teacherName: teacherProfile.name,
                     status: 'Tarde',
-                    time: formatTime12h(now).split(' ').slice(0, 1)[0].split(':').slice(0, 2).join(':') + ' ' + formatTime12h(now).split(' ').slice(1).join(' '),
+                    time: formatTime12hShort(now),
                     details: statusReason
                   })
                 }).then(res => res.json())
@@ -506,7 +516,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
         ]);
         if (error) throw error;
         setIsCheckedIn(true);
-        showNotification(`Entrada marcada: ${formatTime12h(now).replace(/:[0-9]{2} /, ' ')} - Estado: ${status}`);
+        showNotification(`Entrada marcada: ${formatTime12hShort(now)} - Estado: ${status}`);
       } else {
         const { error } = await supabase
           .from('attendance')
@@ -516,7 +526,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
         if (error) throw error;
         setIsCheckedIn(false);
-        showNotification(`Salida marcada: ${formatTime12h(new Date()).replace(/:[0-9]{2} /, ' ')}`);
+        showNotification(`Salida marcada: ${formatTime12hShort(new Date())}`);
       }
       fetchTeacherData();
     } catch (error) {
@@ -545,9 +555,16 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <p style={{ textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.875rem', marginBottom: '1rem' }}>
                   Hora del Servidor
                 </p>
-                <h2 className="clock-display" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <div className="clock-display" style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 'clamp(2.5rem, 8vw, 3.5rem)',
+                  fontWeight: 800,
+                  color: 'var(--secondary)',
+                  fontVariantNumeric: 'tabular-nums',
+                  letterSpacing: '-1px'
+                }}>
                   {formatTime12h(time)}
-                </h2>
+                </div>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
                   {!isCheckedIn ? (
                     <button
@@ -1311,8 +1328,8 @@ const AdminDashboard = ({ onLogout, user }) => {
         const att = (todayAttendance || []).find(a => a.faculty_id === f.id);
         return {
           ...f,
-          entry: att ? formatTime12h(new Date(att.check_in)).split(' ').slice(0, 1)[0].split(':').slice(0, 2).join(':') + ' ' + formatTime12h(new Date(att.check_in)).split(' ').slice(1).join(' ') : '-',
-          exit: att?.check_out ? formatTime12h(new Date(att.check_out)).split(' ').slice(0, 1)[0].split(':').slice(0, 2).join(':') + ' ' + formatTime12h(new Date(att.check_out)).split(' ').slice(1).join(' ') : '-',
+          entry: formatTime12hShort(att?.check_in),
+          exit: formatTime12hShort(att?.check_out),
           status: att ? att.status : 'Ausente'
         };
       });
