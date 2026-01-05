@@ -373,8 +373,8 @@ const TeacherDashboard = ({ onLogout, user }) => {
         id: a.id,
         date: new Date(a.check_in).toLocaleDateString(),
         chair: 'Clase Registrada',
-        entry: new Date(a.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        exit: a.check_out ? new Date(a.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+        entry: new Date(a.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        exit: a.check_out ? new Date(a.check_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
         status: a.status
       }));
       setMyAttendance(formattedHistory);
@@ -457,7 +457,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   body: JSON.stringify({
                     teacherName: teacherProfile.name,
                     status: 'Tarde',
-                    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
                     details: statusReason
                   })
                 }).then(res => res.json())
@@ -482,7 +482,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
         ]);
         if (error) throw error;
         setIsCheckedIn(true);
-        showNotification(`Entrada marcada: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - Estado: ${status}`);
+        showNotification(`Entrada marcada: ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - Estado: ${status}`);
       } else {
         const { error } = await supabase
           .from('attendance')
@@ -492,7 +492,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
         if (error) throw error;
         setIsCheckedIn(false);
-        showNotification(`Salida marcada: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+        showNotification(`Salida marcada: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);
       }
       fetchTeacherData();
     } catch (error) {
@@ -522,7 +522,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   Hora del Servidor
                 </p>
                 <h2 className="clock-display">
-                  {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </h2>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
                   {!isCheckedIn ? (
@@ -886,7 +886,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                         color: 'var(--text-main)'
                       }}
                     >
-                      <span>{justificationChair}</span>
+                      <span>{justificationChair || 'Seleccionar Cátedra'}</span>
                       <ChevronDown size={18} style={{ transform: showJustifyChair ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
                     </button>
                     <AnimatePresence>
@@ -909,7 +909,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                             border: '1px solid rgba(0,0,0,0.05)'
                           }}
                         >
-                          {Array.from(new Set(mySchedule.map(s => s.chair))).map(c => (
+                          {Array.from(new Set((mySchedule || []).map(s => s.chair).filter(Boolean))).map(c => (
                             <button
                               key={c}
                               onClick={() => {
@@ -959,7 +959,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {myJustifications.map(j => (
+                        {(myJustifications || []).map(j => (
                           <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
                             <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{new Date(j.created_at).toLocaleDateString()}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j.reason}</td>
@@ -1046,8 +1046,8 @@ const TeacherDashboard = ({ onLogout, user }) => {
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            {/* Clock for Teacher */}
-            <div className="glass" style={{
+            {/* Clock for Teacher - Hidden on mobile if in attendance tab to avoid duplication */}
+            <div className={`glass header-clock ${activeTab === 'attendance' ? 'desktop-only' : ''}`} style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.8rem',
@@ -1059,8 +1059,8 @@ const TeacherDashboard = ({ onLogout, user }) => {
             }}>
               <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
-                <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1 }}>
-                  {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
+                  {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                   {time.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
@@ -1287,8 +1287,8 @@ const AdminDashboard = ({ onLogout, user }) => {
         const att = (todayAttendance || []).find(a => a.faculty_id === f.id);
         return {
           ...f,
-          entry: att ? new Date(att.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
-          exit: att?.check_out ? new Date(att.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+          entry: att ? new Date(att.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
+          exit: att?.check_out ? new Date(att.check_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-',
           status: att ? att.status : 'Ausente'
         };
       });
@@ -3341,7 +3341,7 @@ const AdminDashboard = ({ onLogout, user }) => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Clock for Admin */}
-            <div className="glass" style={{
+            <div className="glass header-clock" style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.8rem',
@@ -3354,7 +3354,7 @@ const AdminDashboard = ({ onLogout, user }) => {
               <Clock size={20} className="text-secondary" />
               <div style={{ textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
-                  {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                   {currentTime.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
