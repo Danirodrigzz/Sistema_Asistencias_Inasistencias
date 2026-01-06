@@ -555,14 +555,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <p style={{ textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.875rem', marginBottom: '1rem' }}>
                   Hora del Servidor
                 </p>
-                <div className="clock-display" style={{
-                  fontFamily: "'Outfit', sans-serif",
-                  fontSize: 'clamp(2.5rem, 8vw, 3.5rem)',
-                  fontWeight: 800,
-                  color: 'var(--secondary)',
-                  fontVariantNumeric: 'tabular-nums',
-                  letterSpacing: '-1px'
-                }}>
+                <div className="clock-display">
                   {formatTime12h(time)}
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
@@ -1098,9 +1091,9 @@ const TeacherDashboard = ({ onLogout, user }) => {
               boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
               background: 'rgba(255,255,255,0.4)'
             }}>
-              <Clock size={20} className="text-secondary" />
+              <Clock size={20} className="text-terracotta" />
               <div style={{ textAlign: 'right' }}>
-                <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
+                <span className="clock-stabilized" style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
                   {formatTime12h(time)}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
@@ -3392,9 +3385,9 @@ const AdminDashboard = ({ onLogout, user }) => {
               boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
               background: 'rgba(255,255,255,0.4)'
             }}>
-              <Clock size={20} className="text-secondary" />
+              <Clock size={20} className="text-terracotta" />
               <div style={{ textAlign: 'right' }}>
-                <span style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
+                <span className="clock-stabilized" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>
                   {formatTime12h(currentTime)}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>

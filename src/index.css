@@ -27,10 +27,19 @@
   --sidebar-width: 280px;
 }
 
-.clock-display {
+.clock-display,
+.clock-stabilized {
   font-family: 'Outfit', sans-serif !important;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.5px;
+}
+
+.clock-display {
+  font-size: clamp(3rem, 10vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  margin: 0.5rem 0;
+  color: var(--white) !important;
+  line-height: 1;
 }
 
 * {
@@ -237,12 +246,7 @@ select {
   box-shadow: 0 20px 40px rgba(27, 67, 50, 0.2);
 }
 
-.clock-display {
-  font-size: clamp(3rem, 10vw, 5rem);
-  font-weight: 800;
-  letter-spacing: -3px;
-  margin: 0.5rem 0;
-}
+/* Clock display absorbed into global rules */
 
 .badge {
   padding: 0.5rem 1rem;
@@ -453,10 +457,8 @@ select {
   }
 
   .clock-display {
-    font-size: 3rem;
-    font-family: 'Outfit', sans-serif !important;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -1px;
+    font-size: 2.8rem;
+    letter-spacing: -0.5px;
   }
 
   .btn-primary,
@@ -519,8 +521,7 @@ select {
 
 @media screen and (max-width: 480px) {
   .clock-display {
-    font-size: 2rem;
-    font-family: 'Outfit', sans-serif !important;
+    font-size: 2.2rem;
   }
 
   .auth-card {
