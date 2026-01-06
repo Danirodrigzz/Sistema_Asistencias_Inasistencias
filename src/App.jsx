@@ -119,29 +119,42 @@ const formatTime12h = (date) => {
   let h = d.getHours();
   const m = String(d.getMinutes()).padStart(2, '0');
   const s = String(d.getSeconds()).padStart(2, '0');
-  const ampm = h >= 12 ? 'p.m.' : 'a.m.';
+  const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
   return `${String(h).padStart(2, '0')}:${m}:${s} ${ampm}`;
 };
 
 const formatTime12hShort = (date) => {
-  const t = formatTime12h(date);
-  if (t.includes('--')) return '-';
-  const parts = t.split(' ');
-  const timeParts = parts[0].split(':');
-  return `${timeParts[0]}:${timeParts[1]} ${parts[1]}`;
+  if (!date) return "-";
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "-";
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
 };
 
-// Helper: Safe date formatter
+// Helper: Safe date formatter (Manual to avoid system locale flickers)
 const formatDateVE = (isoStr) => {
   if (!isoStr) return "-";
   try {
     const d = new Date(isoStr);
     if (isNaN(d.getTime())) return isoStr;
-    return d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch (e) {
     return isoStr;
   }
+};
+
+const getLongDateVE = (date) => {
+  if (!date || isNaN(date.getTime())) return "";
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
 };
 
 // --- Components ---
@@ -1097,7 +1110,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   {formatTime12h(time)}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
-                  {time.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
+                  {getLongDateVE(time)}
                 </span>
               </div>
             </div>
@@ -3391,7 +3404,7 @@ const AdminDashboard = ({ onLogout, user }) => {
                   {formatTime12h(currentTime)}
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
-                  {currentTime.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' })}
+                  {getLongDateVE(currentTime)}
                 </span>
               </div>
             </div>
