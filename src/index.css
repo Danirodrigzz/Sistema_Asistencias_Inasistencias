@@ -420,16 +420,27 @@ select {
   z-index: 5;
 }
 
-/* Ocultar indicator nativo (gris) pero expandir para que todo el campo sea clickeable */
-.date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
+/* Ocultar ABSOLUTAMENTE todos los controles nativos del navegador (flecha gris, iconos, etc.) */
+.date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator,
+.date-input-wrapper input[type="date"]::-webkit-inner-spin-button,
+.date-input-wrapper input[type="date"]::-webkit-clear-button {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  opacity: 0;
+  opacity: 0 !important;
   cursor: pointer;
   z-index: 10;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.date-input-wrapper input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  z-index: 1;
 }
 
 @media screen and (max-width: 768px) {
