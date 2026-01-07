@@ -376,6 +376,10 @@ const TeacherDashboard = ({ onLogout, user }) => {
   const [showJustifyChair, setShowJustifyChair] = useState(false);
   const [justificationChair, setJustificationChair] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [justificationDate, setJustificationDate] = useState('');
+  const [justificationReason, setJustificationReason] = useState('');
+  const [justificationFile, setJustificationFile] = useState(null);
+  const [submittingJustification, setSubmittingJustification] = useState(false);
 
   const showNotification = (message, type = 'success') => {
     setToast({ message, type });
@@ -585,6 +589,82 @@ const TeacherDashboard = ({ onLogout, user }) => {
     } catch (error) {
       alert('Error al marcar asistencia: ' + error.message);
     }
+  };
+
+  const handleJustificationSubmit = async () => {
+    if (!justificationDate || !justificationChair || !justificationReason) {
+      showNotification('Por favor complete todos los campos obligatorios', 'error');
+      return;
+    }
+
+    setSubmittingJustification(true);
+    try {
+      let fileUrl = null;
+
+      if (justificationFile) {
+        const fileExt = justificationFile.name.split('.').pop();
+        const fileName = `${teacherProfile.id}-${Date.now()}.${fileExt}`;
+        const filePath = `justifications/${fileName}`;
+
+        const { error: uploadError, data } = await supabase.storage
+          .from('justifications')
+          .upload(filePath, justificationFile);
+
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          // Continuamos sin archivo si falla la subida? O alertamos? 
+          // Mejor alertar para que el docente sepa que el comprobante es importante.
+          if (uploadError.message.includes('bucket not found')) {
+            console.log('Bucket "justifications" no existe, guardando solo la data.');
+          } else {
+            throw new Error('Error al subir el comprobante: ' + uploadError.message);
+          }
+        } else {
+          fileUrl = filePath; // Guardamos solo la ruta para generar Signed URLs después
+        }
+      }
+
+      const { error } = await supabase.from('justifications').insert([
+        {
+          faculty_id: teacherProfile.id,
+          absence_date: justificationDate,
+          chair: justificationChair,
+          reason: justificationReason,
+          status: 'Pendiente',
+          file_url: fileUrl
+        }
+      ]);
+
+      if (error) throw error;
+
+      showNotification('Justificación enviada correctamente');
+      setJustificationDate('');
+      setJustificationChair('');
+      setJustificationReason('');
+      setJustificationFile(null);
+      fetchTeacherData(); // Recargar lista
+    } catch (error) {
+      showNotification('Error al enviar: ' + error.message, 'error');
+    } finally {
+      setSubmittingJustification(false);
+    }
+  };
+
+  const handleViewFile = async (path) => {
+    if (!path) return;
+    if (path.startsWith('http')) {
+      window.open(path, '_blank');
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from('justifications')
+      .createSignedUrl(path, 60);
+    if (error) {
+      console.error('Error:', error);
+      alert('Enlace expirado o inválido');
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
   };
 
   const handleReposicion = () => {
@@ -932,8 +1012,11 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   <label>Fecha de Ausencia</label>
                   <div className="date-input-wrapper">
                     <Calendar className="calendar-icon" size={20} />
-                    <input type="date" />
-                    <ChevronDown className="date-arrow-icon" size={22} />
+                    <input
+                      type="date"
+                      value={justificationDate}
+                      onChange={(e) => setJustificationDate(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="input-group">
@@ -995,13 +1078,59 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>Comprobante</label>
-                  <div style={{ border: '2px dashed #ddd', padding: '2rem', borderRadius: '12px', textAlign: 'center' }}>
-                    <FileUp size={24} className="text-muted" />
-                    <p className="text-muted" style={{ fontSize: '0.8rem' }}>Subir PDF o Foto</p>
+                  <label>Motivo / Explicación</label>
+                  <textarea
+                    rows="3"
+                    value={justificationReason}
+                    onChange={(e) => setJustificationReason(e.target.value)}
+                    placeholder="Describe el motivo de la inasistencia..."
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      borderRadius: '16px',
+                      border: '2px solid #f0f0f0',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      fontSize: '0.95rem',
+                      resize: 'none'
+                    }}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>Comprobante (Opcional)</label>
+                  <div
+                    style={{
+                      border: '2px dashed #ddd',
+                      padding: '1.5rem',
+                      borderRadius: '16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: justificationFile ? '#f0f9ff' : 'transparent',
+                      borderColor: justificationFile ? 'var(--primary)' : '#ddd',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onClick={() => document.getElementById('justificationFile').click()}
+                  >
+                    <FileUp size={24} className={justificationFile ? 'text-terracotta' : 'text-muted'} />
+                    <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                      {justificationFile ? justificationFile.name : 'Subir PDF o Foto'}
+                    </p>
+                    <input
+                      id="justificationFile"
+                      type="file"
+                      hidden
+                      onChange={(e) => setJustificationFile(e.target.files[0])}
+                    />
                   </div>
                 </div>
-                <button className="btn-primary" style={{ width: '100%' }}>Enviar</button>
+                <button
+                  className="btn-primary"
+                  style={{ width: '100%', opacity: submittingJustification ? 0.7 : 1 }}
+                  onClick={handleJustificationSubmit}
+                  disabled={submittingJustification}
+                >
+                  {submittingJustification ? 'Enviando...' : 'Enviar Justificación'}
+                </button>
               </div>
               <div className="card">
                 <h3 style={{ marginBottom: '1.5rem' }}>Estados de Trámite</h3>
@@ -1011,19 +1140,35 @@ const TeacherDashboard = ({ onLogout, user }) => {
                       <thead>
                         <tr style={{ textAlign: 'left', borderBottom: '2px solid #f8f8f8' }}>
                           <th style={{ padding: '0.75rem 0.5rem' }}>Fecha</th>
-                          <th style={{ padding: '0.75rem 0.5rem' }}>Motivo</th>
+                          <th style={{ padding: '0.75rem 0.5rem' }}>Cátedra</th>
                           <th style={{ padding: '0.75rem 0.5rem' }}>Estado</th>
+                          <th style={{ padding: '0.75rem 0.5rem' }}>Detalle</th>
                         </tr>
                       </thead>
                       <tbody>
                         {myJustifications.map(j => (
                           <tr key={j?.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>{j?.created_at ? formatDateVE(j.created_at) : (j?.date || '-')}</td>
-                            <td style={{ padding: '0.75rem 0.5rem' }} className="text-muted">{j?.reason || '-'}</td>
+                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>
+                              {j?.absence_date ? new Date(j.absence_date + 'T12:00:00').toLocaleDateString('es-VE') : '-'}
+                            </td>
+                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600, color: 'var(--secondary)' }}>{j?.chair || '-'}</td>
                             <td style={{ padding: '0.75rem 0.5rem' }}>
                               <span className={`badge ${(j?.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
                                 (j?.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
                                   'badge-warning'}`}>{j?.status || 'Pendiente'}</span>
+                            </td>
+                            <td style={{ padding: '0.75rem 0.5rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {j?.file_url && (
+                                  <button
+                                    onClick={() => handleViewFile(j.file_url)}
+                                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                  >
+                                    <FileUp size={16} title="Ver adjunto" />
+                                  </button>
+                                )}
+                                <span className="text-muted" style={{ fontSize: '0.8rem' }} title={j?.reason}>Ver motivo</span>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1399,7 +1544,8 @@ const AdminDashboard = ({ onLogout, user }) => {
 
       const formattedJusts = (justs || []).map(j => ({
         ...j,
-        professor: j.faculty_members?.name || 'Desconocido'
+        professor: j.faculty_members?.name || 'Desconocido',
+        date: j.absence_date ? new Date(j.absence_date + 'T12:00:00').toLocaleDateString('es-VE') : '-'
       }));
       setJustificationsList(formattedJusts);
 
@@ -1818,6 +1964,23 @@ const AdminDashboard = ({ onLogout, user }) => {
     } catch (error) {
       alert('Error: ' + error.message);
     }
+  };
+
+  const handleViewFile = async (path) => {
+    if (!path) return;
+    if (path.startsWith('http')) {
+      window.open(path, '_blank');
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from('justifications')
+      .createSignedUrl(path, 60);
+    if (error) {
+      console.error('Error:', error);
+      alert('Enlace expirado o inválido');
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
   };
 
   const handleJustificationStatus = async (id, newStatus) => {
@@ -3032,6 +3195,7 @@ const AdminDashboard = ({ onLogout, user }) => {
                     <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
                       <th style={{ padding: '1.5rem' }}>Profesor</th>
                       <th style={{ padding: '1.5rem' }}>Fecha</th>
+                      <th style={{ padding: '1.5rem' }}>Cátedra</th>
                       <th style={{ padding: '1.5rem' }}>Motivo</th>
                       <th style={{ padding: '1.5rem' }}>Adjunto</th>
                       <th style={{ padding: '1.5rem' }}>Estado</th>
@@ -3045,13 +3209,35 @@ const AdminDashboard = ({ onLogout, user }) => {
                           <div style={{ fontWeight: 700 }}>{j.professor}</div>
                         </td>
                         <td style={{ padding: '1.5rem', fontWeight: 600 }}>{j.date}</td>
+                        <td style={{ padding: '1.5rem', fontWeight: 600, color: 'var(--secondary)' }}>{j.chair || '-'}</td>
                         <td style={{ padding: '1.5rem', maxWidth: '300px' }}>
                           <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', opacity: 0.8 }}>{j.reason}</div>
                         </td>
                         <td style={{ padding: '1.5rem' }}>
-                          <button className="btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FileUp size={14} /> Ver
-                          </button>
+                          {j.file_url ? (
+                            <button
+                              onClick={() => handleViewFile(j.file_url)}
+                              className="btn-outline"
+                              style={{
+                                padding: '0.4rem 0.8rem',
+                                fontSize: '0.8rem',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                textDecoration: 'none',
+                                color: 'var(--secondary)',
+                                width: 'fit-content',
+                                border: '1px solid var(--secondary)',
+                                background: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <FileUp size={14} /> Ver
+                            </button>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '0.8rem' }}>Sin adjunto</span>
+                          )}
                         </td>
                         <td style={{ padding: '1.5rem' }}>
                           <span className={`badge ${(j.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
