@@ -1410,6 +1410,10 @@ const AdminDashboard = ({ onLogout, user }) => {
   });
   const [statsData, setStatsData] = useState([]);
   const [distributionData, setDistributionData] = useState([]);
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [monthlyReportData, setMonthlyReportData] = useState([]);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   // --- Effects ---
   useEffect(() => {
@@ -1818,6 +1822,82 @@ const AdminDashboard = ({ onLogout, user }) => {
     }
   };
 
+  const handleFetchMonthlyReport = async () => {
+    setIsGeneratingReport(true);
+    try {
+      const startDate = `${reportYear}-${reportMonth.toString().padStart(2, '0')}-01`;
+      const lastDay = new Date(reportYear, reportMonth, 0).getDate();
+      const endDate = `${reportYear}-${reportMonth.toString().padStart(2, '0')}-${lastDay}`;
+
+      const { data: attendanceData, error: attError } = await supabase
+        .from('attendance')
+        .select(`
+          status,
+          date,
+          profile_id
+        `)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (attError) throw attError;
+
+      const { data: justificationsData, error: justError } = await supabase
+        .from('justifications')
+        .select(`
+          status,
+          date,
+          faculty_id
+        `)
+        .eq('status', 'Aprobada')
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (justError) throw justError;
+
+      const reportMap = {};
+
+      facultyMembers.forEach(f => {
+        reportMap[f.id] = {
+          id: f.id,
+          name: f.name,
+          chair: f.chair,
+          presents: 0,
+          delays: 0,
+          absences: 0,
+          justified: 0
+        };
+      });
+
+      attendanceData?.forEach(record => {
+        const profId = record.profile_id;
+        if (!reportMap[profId]) return;
+
+        if (record.status === 'Presente' || record.status === 'A tiempo') {
+          reportMap[profId].presents++;
+        } else if (record.status === 'Tarde' || record.status === 'Retraso') {
+          reportMap[profId].delays++;
+        } else if (record.status === 'Ausente') {
+          reportMap[profId].absences++;
+        }
+      });
+
+      justificationsData?.forEach(just => {
+        const profId = just.faculty_id;
+        if (reportMap[profId]) {
+          reportMap[profId].justified++;
+        }
+      });
+
+      setMonthlyReportData(Object.values(reportMap));
+      showNotification('Datos del reporte cargados correctamente', 'success');
+    } catch (error) {
+      console.error('Error fetching report:', error);
+      alert('Error al generar reporte: ' + error.message);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   const handleDeleteFaculty = async () => {
     try {
       // Obtener sesión actual para el token
@@ -2025,91 +2105,111 @@ const AdminDashboard = ({ onLogout, user }) => {
   const generatePDF = (month) => {
     try {
       const doc = new jsPDF();
-
-      // Colores corporativos
-      const primaryColor = [212, 122, 77]; // Terracota
-      const secondaryColor = [27, 67, 50]; // Verde Bosque
+      const primaryColor = [212, 122, 77];
+      const secondaryColor = [27, 67, 50];
 
       // Encabezado
       doc.setFillColor(...secondaryColor);
-      doc.rect(0, 0, 210, 40, 'F');
+      doc.rect(0, 0, 210, 45, 'F');
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(18);
+      doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
-      doc.text('CONSERVATORIO DE MÚSICA', 105, 15, { align: 'center' });
-      doc.text('JUAN MANUEL OLIVARES', 105, 25, { align: 'center' });
+      doc.text('CONSERVATORIO DE MÚSICA', 105, 18, { align: 'center' });
+      doc.text('JUAN MANUEL OLIVARES', 105, 28, { align: 'center' });
 
-      doc.setFontSize(12);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'normal');
-      doc.text(`REPORTE DE ASISTENCIA - ${month.toUpperCase()}`, 105, 33, { align: 'center' });
+      doc.text(`REPORTE DOCENTE MENSUAL - ${month.toUpperCase()}`, 105, 38, { align: 'center' });
 
-      // Fecha de generación
+      // Info de generación
       doc.setTextColor(100, 100, 100);
       doc.setFontSize(9);
-      doc.text(`Generado el: ${new Date().toLocaleString('es-VE')}`, 195, 48, { align: 'right' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-VE')}`, 195, 52, { align: 'right' });
 
-      // Resumen de Asistencia
+      // Cálculo de métricas globales del mes
+      const totalPresents = monthlyReportData.reduce((acc, curr) => acc + curr.presents, 0);
+      const totalDelays = monthlyReportData.reduce((acc, curr) => acc + curr.delays, 0);
+      const totalAbsences = monthlyReportData.reduce((acc, curr) => acc + curr.absences, 0);
+      const totalJustified = monthlyReportData.reduce((acc, curr) => acc + curr.justified, 0);
+
+      // Cuadro de Resumen Estadístico
       doc.setTextColor(...secondaryColor);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Resumen de Asistencia', 14, 55);
+      doc.text('Resumen Ejecutivo del Mes', 14, 65);
 
       autoTable(doc, {
-        startY: 60,
-        head: [['Métrica', 'Valor']],
+        startY: 70,
+        head: [['Métrica Mensual', 'Total Acumulado']],
         body: [
-          ['Asistencia Total', '94.5%'],
-          ['Justificaciones Aprobadas', '18'],
-          ['Retrasos registrados', '12'],
-          ['Ausencias sin justificar', '8']
+          ['Total de Asistencias (Marcadas)', totalPresents],
+          ['Total de Retrasos Registrados', totalDelays],
+          ['Total de Inasistencias', totalAbsences],
+          ['Ausencias Justificadas', totalJustified]
         ],
         headStyles: { fillColor: secondaryColor },
+        styles: { fontSize: 10, cellPadding: 4 },
         theme: 'striped'
       });
 
-      // Personal Docente
+      // Detalle por Docente
       const finalY1 = doc.lastAutoTable ? doc.lastAutoTable.finalY : 100;
       doc.setTextColor(...secondaryColor);
-      doc.text('Listado de Personal Docente', 14, finalY1 + 15);
+      doc.setFontSize(14);
+      doc.text('Detalle por Personal Docente', 14, finalY1 + 15);
 
       autoTable(doc, {
         startY: finalY1 + 20,
-        head: [['#', 'Nombre Completo', 'Cátedra', 'Estado']],
-        body: facultyMembers.map((f, i) => [i + 1, f.name, f.chair, f.status]),
-        headStyles: { fillColor: secondaryColor },
+        head: [['Docente', 'Cátedra', 'Asis.', 'Retr.', 'Faltas', 'Just.']],
+        body: monthlyReportData.map(row => [
+          row.name,
+          row.chair,
+          row.presents,
+          row.delays,
+          row.absences,
+          row.justified
+        ]),
+        headStyles: { fillColor: primaryColor },
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+          5: { halign: 'center' }
+        },
         theme: 'grid'
       });
 
-      // Cátedras
-      doc.addPage();
-      doc.setTextColor(...secondaryColor);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Cátedras e Instancias Activas', 14, 20);
+      // Firmas
+      const finalY2 = doc.lastAutoTable ? doc.lastAutoTable.finalY : 200;
+      if (finalY2 > 240) doc.addPage();
 
-      autoTable(doc, {
-        startY: 25,
-        head: [['ID', 'Nombre de Cátedra', 'Salón', 'Tipo', 'Estudiantes', 'Docentes']],
-        body: academicChairs.map(c => [c.id, c.name, c.room, c.type, c.students, c.faculty]),
-        headStyles: { fillColor: secondaryColor },
-        theme: 'grid'
-      });
+      const signatureY = finalY2 > 240 ? 50 : finalY2 + 30;
 
-      // Pie de página en todas las páginas
+      doc.setDrawColor(200, 200, 200);
+      doc.line(30, signatureY, 80, signatureY);
+      doc.line(130, signatureY, 180, signatureY);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Firma Dirección Académica', 55, signatureY + 5, { align: 'center' });
+      doc.text('Sello de la Institución', 155, signatureY + 5, { align: 'center' });
+
+      // Pie de página
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Página ${i} de ${pageCount} - Sistema de Gestión J.M. Olivares`, 105, 285, { align: 'center' });
+        doc.text(`Sistema de Gestión J.M. Olivares - Página ${i} de ${pageCount}`, 105, 285, { align: 'center' });
       }
 
-      // Guardar PDF
-      doc.save(`Reporte_${month.replace(' ', '_')}.pdf`);
+      doc.save(`Reporte_Mensual_${month.replace(' ', '_')}.pdf`);
+      showNotification('PDF generado con éxito', 'success');
     } catch (error) {
       console.error("Error al generar el PDF:", error);
-      alert("Hubo un error al generar el PDF. Por favor, intenta de nuevo.");
+      alert("Hubo un error al generar el PDF.");
     }
   };
 
@@ -3120,12 +3220,21 @@ const AdminDashboard = ({ onLogout, user }) => {
           </motion.div>
         );
       case 'reports':
+        const monthsNames = [
+          'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <h2 className="brand-font" style={{ fontSize: '2rem' }}>Reportes Mensuales</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1.5rem' }}>
+              <div>
+                <h2 className="brand-font" style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>Reportes Mensuales</h2>
+                <p className="text-muted">Genera reportes detallados de asistencia y cumplimiento docente.</p>
+              </div>
               <button
                 className="btn-primary"
+                disabled={monthlyReportData.length === 0}
                 style={{
                   background: 'var(--secondary)',
                   padding: '0.8rem 1.8rem',
@@ -3133,51 +3242,91 @@ const AdminDashboard = ({ onLogout, user }) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.8rem',
-                  boxShadow: '0 4px 15px rgba(27, 67, 50, 0.2)'
+                  boxShadow: '0 4px 15px rgba(27, 67, 50, 0.2)',
+                  opacity: monthlyReportData.length === 0 ? 0.6 : 1
                 }}
-                onClick={() => generatePDF('Anual_2025')}
+                onClick={() => generatePDF(`${monthsNames[reportMonth - 1]} ${reportYear}`)}
               >
-                <Download size={20} /> <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Exportar Reporte Anual</span>
+                <Download size={20} /> <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Exportar PDF Profesional</span>
               </button>
             </div>
-            <div className="grid-cols-3">
-              {['Diciembre 2025', 'Noviembre 2025', 'Octubre 2025'].map(month => (
-                <div key={month} className="card" style={{ borderRadius: '24px', padding: '1.8rem' }}>
-                  <div style={{ background: 'var(--bg-cream)', padding: '1.2rem', borderRadius: '16px', marginBottom: '1.8rem', display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-                    <div style={{ background: 'white', padding: '0.8rem', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
-                      <FileBox className="text-forest" size={24} />
-                    </div>
-                    <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{month}</span>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span>Asistencia Total</span>
-                      <span style={{ fontWeight: 700 }}>94.5%</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Justificaciones</span>
-                      <span style={{ fontWeight: 700 }}>18</span>
-                    </div>
-                  </div>
-                  <button
-                    className="btn-primary"
-                    style={{
-                      width: '100%',
-                      fontSize: '0.95rem',
-                      background: 'var(--secondary)',
-                      borderRadius: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.6rem'
-                    }}
-                    onClick={() => generatePDF(month)}
+
+            <div className="card" style={{ padding: '2rem', marginBottom: '2.5rem' }}>
+              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '200px' }}>
+                  <label>Seleccionar Mes</label>
+                  <select
+                    value={reportMonth}
+                    onChange={(e) => setReportMonth(parseInt(e.target.value))}
+                    style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd' }}
                   >
-                    <Download size={18} /> Generar PDF
-                  </button>
+                    {monthsNames.map((name, idx) => (
+                      <option key={idx} value={idx + 1}>{name}</option>
+                    ))}
+                  </select>
                 </div>
-              ))}
+                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '150px' }}>
+                  <label>Año</label>
+                  <select
+                    value={reportYear}
+                    onChange={(e) => setReportYear(parseInt(e.target.value))}
+                    style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd' }}
+                  >
+                    {[2024, 2025, 2026].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  className="btn-primary"
+                  onClick={handleFetchMonthlyReport}
+                  disabled={isGeneratingReport}
+                  style={{ padding: '0.8rem 2rem', borderRadius: '14px', height: 'fit-content' }}
+                >
+                  {isGeneratingReport ? 'Procesando...' : 'Calcular Reporte'}
+                </button>
+              </div>
             </div>
+
+            {monthlyReportData.length > 0 ? (
+              <div className="card" style={{ padding: 0 }}>
+                <div style={{ padding: '1.5rem', borderBottom: '1px solid #eee' }}>
+                  <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Resultados para {monthsNames[reportMonth - 1]} {reportYear}</h3>
+                </div>
+                <div className="table-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                        <th style={{ padding: '1.25rem 1.5rem' }}>Docente</th>
+                        <th style={{ padding: '1.25rem 1.5rem' }}>Cátedra</th>
+                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Asistencias</th>
+                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Retrasos</th>
+                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Faltas</th>
+                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Justificadas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyReportData.map(row => (
+                        <tr key={row.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                          <td data-label="Docente" style={{ padding: '1.25rem 1.5rem', fontWeight: 700 }}>{row.name}</td>
+                          <td data-label="Cátedra" style={{ padding: '1.25rem 1.5rem' }}>{row.chair}</td>
+                          <td data-label="Asistencias" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--forest)', fontWeight: 700 }}>{row.presents}</td>
+                          <td data-label="Retrasos" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--warning)', fontWeight: 700 }}>{row.delays}</td>
+                          <td data-label="Faltas" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{row.absences}</td>
+                          <td data-label="Justificadas" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: '#0ea5e9', fontWeight: 700 }}>{row.justified}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '5rem', background: 'white', borderRadius: '32px', border: '1px dashed #ddd' }}>
+                <FileText size={50} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
+                <h3 style={{ color: 'var(--text-muted)' }}>No hay datos calculados</h3>
+                <p className="text-muted">Selecciona un mes y año para generar el reporte estadístico.</p>
+              </div>
+            )}
           </motion.div>
         );
       case 'justifications':
