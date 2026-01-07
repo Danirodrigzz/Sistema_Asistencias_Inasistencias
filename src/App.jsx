@@ -933,6 +933,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   <div className="date-input-wrapper">
                     <Calendar className="calendar-icon" size={20} />
                     <input type="date" />
+                    <ChevronDown className="date-arrow-icon" size={22} />
                   </div>
                 </div>
                 <div className="input-group">
