@@ -401,6 +401,7 @@ select {
 
 .date-input-wrapper input[type="date"] {
   padding-left: 3rem !important;
+  cursor: pointer;
 }
 
 .date-input-wrapper .calendar-icon {
@@ -408,13 +409,29 @@ select {
   left: 1.25rem;
   color: var(--primary);
   pointer-events: none;
+  z-index: 10;
 }
 
+.date-input-wrapper .date-arrow-icon {
+  position: absolute;
+  right: 1.25rem;
+  color: var(--primary);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.8;
+}
+
+/* Ocultar indicator nativo pero permitir que el input sea clickeable */
 .date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   cursor: pointer;
-  padding: 0.2rem;
-  filter: sepia(100%) saturate(200%) hue-rotate(-20deg) brightness(90%);
-  opacity: 0.7;
+  opacity: 0;
 }
 
 @media screen and (max-width: 768px) {

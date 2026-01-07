@@ -906,7 +906,8 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   <label>Fecha de Ausencia</label>
                   <div className="date-input-wrapper">
                     <Calendar className="calendar-icon" size={20} />
-                    <input type="date" />
+                    <input type="date" style={{ paddingRight: '3rem' }} />
+                    <ChevronDown className="date-arrow-icon" size={20} />
                   </div>
                 </div>
                 <div className="input-group">
