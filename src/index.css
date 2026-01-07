@@ -148,11 +148,23 @@ h3,
 }
 
 .input-group input:focus,
-.input-group select:focus {
+.input-group select:focus,
+.input-group textarea:focus {
   border-color: var(--primary);
-  background: white;
-  box-shadow: 0 0 0 5px rgba(212, 122, 77, 0.1);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(212, 122, 77, 0.1);
   transform: translateY(-1px);
+}
+
+/* Ocultar el icono de ojo nativo de Edge, Chrome y otros navegadores */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Custom Select Dropdown */
