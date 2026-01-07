@@ -39,7 +39,9 @@ import {
   ShieldCheck,
   Smartphone,
   ChevronDown,
-  Menu
+  Menu,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import {
   BarChart,
@@ -163,6 +165,7 @@ const LoginPage = ({ onLogin }) => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -271,13 +274,36 @@ const LoginPage = ({ onLogin }) => {
         </div>
         <div className="input-group">
           <label>Contraseña</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              style={{ paddingRight: '3.5rem' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10
+              }}
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
         </div>
 
         <button
@@ -906,8 +932,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   <label>Fecha de Ausencia</label>
                   <div className="date-input-wrapper">
                     <Calendar className="calendar-icon" size={20} />
-                    <input type="date" style={{ paddingRight: '3rem' }} />
-                    <ChevronDown className="date-arrow-icon" size={20} />
+                    <input type="date" />
                   </div>
                 </div>
                 <div className="input-group">
