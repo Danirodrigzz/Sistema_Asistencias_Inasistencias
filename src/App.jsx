@@ -627,6 +627,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
       const { error } = await supabase.from('justifications').insert([
         {
           faculty_id: teacherProfile.id,
+          date: justificationDate, // Campo requerido por la BD
           absence_date: justificationDate,
           chair: justificationChair,
           reason: justificationReason,
@@ -2134,7 +2135,7 @@ const AdminDashboard = ({ onLogout, user }) => {
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sin justificar (Est.)</p>
               </div>
               <div className="card">
-                <p className="text-muted" style={{ fontSize: '0.875rem' }}>Repuestas</p>
+                <p className="text-muted" style={{ fontSize: '0.875rem' }}>Justificaciones</p>
                 <h2 style={{ fontSize: '2rem', color: 'var(--forest)' }}>{dashboardStats.recovered}</h2>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>En el Año Escolar</p>
               </div>
