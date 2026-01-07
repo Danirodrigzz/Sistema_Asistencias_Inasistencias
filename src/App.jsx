@@ -339,6 +339,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
   const [mySchedule, setMySchedule] = useState([]);
   const [myAttendance, setMyAttendance] = useState([]);
   const [myJustifications, setMyJustifications] = useState([]);
+  const [alreadyCheckedOutToday, setAlreadyCheckedOutToday] = useState(false);
 
   const [scheduleSearch, setScheduleSearch] = useState('');
   const [scheduleTypeFilter, setScheduleTypeFilter] = useState('Todos');
@@ -364,11 +365,11 @@ const TeacherDashboard = ({ onLogout, user }) => {
         return;
       }
 
-      // 1. Profile
+      // 1. Profile - Búsqueda robusta por ID o Email (ilike para evitar problemas de mayúsculas)
       const { data: profile, error: pError } = await supabase
         .from('faculty_members')
         .select('*')
-        .eq('email', sessionUser.email)
+        .or(`id.eq.${sessionUser.id},email.ilike.${sessionUser.email}`)
         .maybeSingle();
 
       if (pError) console.error('Error fetching profile:', pError);
@@ -411,9 +412,22 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
       if (attendance && attendance.length > 0) {
         const lastEntry = attendance[0];
-        if (!lastEntry.check_out) {
+        const lastEntryDate = new Date(lastEntry.check_in).toDateString();
+        const todayDate = new Date().toDateString();
+
+        if (lastEntryDate === todayDate && lastEntry.check_out) {
+          setAlreadyCheckedOutToday(true);
+          setIsCheckedIn(false);
+        } else if (!lastEntry.check_out) {
           setIsCheckedIn(true);
+          setAlreadyCheckedOutToday(false);
+        } else {
+          setIsCheckedIn(false);
+          setAlreadyCheckedOutToday(false);
         }
+      } else {
+        setIsCheckedIn(false);
+        setAlreadyCheckedOutToday(false);
       }
 
       const formattedHistory = (attendance || []).map(a => ({
@@ -572,30 +586,40 @@ const TeacherDashboard = ({ onLogout, user }) => {
                   {formatTime12h(time)}
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
-                  {!isCheckedIn ? (
-                    <button
-                      className="btn-primary"
-                      style={{ padding: '1rem 2rem', fontSize: '1rem', flex: '1', minWidth: '200px' }}
-                      onClick={handleCheckIn}
-                    >
-                      Marcar Entrada
-                    </button>
+                  {alreadyCheckedOutToday ? (
+                    <div className="card" style={{ background: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', flex: 1, textAlign: 'center', padding: '1rem', color: 'white' }}>
+                      <p style={{ fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                        <CheckCircle2 size={24} /> Asistencia del día completada
+                      </p>
+                    </div>
                   ) : (
-                    <button
-                      className="btn-primary"
-                      style={{ background: 'var(--danger)', padding: '1rem 2rem', fontSize: '1rem', flex: '1', minWidth: '200px' }}
-                      onClick={handleCheckIn}
-                    >
-                      Marcar Salida
-                    </button>
+                    <>
+                      {!isCheckedIn ? (
+                        <button
+                          className="btn-primary"
+                          style={{ padding: '1rem 2rem', fontSize: '1rem', flex: '1', minWidth: '200px' }}
+                          onClick={handleCheckIn}
+                        >
+                          Marcar Entrada
+                        </button>
+                      ) : (
+                        <button
+                          className="btn-primary"
+                          style={{ background: 'var(--danger)', padding: '1rem 2rem', fontSize: '1rem', flex: '1', minWidth: '200px' }}
+                          onClick={handleCheckIn}
+                        >
+                          Marcar Salida
+                        </button>
+                      )}
+                      <button
+                        className="btn-outline"
+                        style={{ borderColor: 'white', color: 'white', padding: '1rem 2rem', flex: '1', minWidth: '200px' }}
+                        onClick={handleReposicion}
+                      >
+                        Marcar como Reposición
+                      </button>
+                    </>
                   )}
-                  <button
-                    className="btn-outline"
-                    style={{ borderColor: 'white', color: 'white', padding: '1rem 2rem', flex: '1', minWidth: '200px' }}
-                    onClick={handleReposicion}
-                  >
-                    Marcar como Reposición
-                  </button>
                 </div>
               </div>
             </section>
@@ -1267,48 +1291,67 @@ const AdminDashboard = ({ onLogout, user }) => {
 
   // --- Realtime Push Notifications ---
   useEffect(() => {
-    if (!systemSettings.notificationsEnabled || typeof Notification === 'undefined') return;
-
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-
+    // Suscripción Realtime para actualizar la UI automáticamente
     const subscription = supabase
-      .channel('attendance-alerts')
+      .channel('attendance-changes')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'attendance' },
+        { event: '*', schema: 'public', table: 'attendance' },
         async (payload) => {
-          if (payload.new.status === 'Tarde') {
+          console.log('Cambio detectado en asistencia:', payload);
+          // Esta función actualiza todo el Dashboard (gráficas, contadores, lista)
+          fetchAllData();
+
+          // Lógica de notificaciones (solo si están habilitadas)
+          if (systemSettings.notificationsEnabled) {
             let teacherName = 'Un profesor';
-            const localTeacher = facultyMembers.find(f => f.id === payload.new.faculty_id);
-            if (localTeacher) {
-              teacherName = localTeacher.name;
-            } else {
-              const { data } = await supabase.from('faculty_members').select('name').eq('id', payload.new.faculty_id).single();
-              if (data) teacherName = data.name;
+            if (payload.new && payload.new.faculty_id) {
+              const localTeacher = facultyMembers.find(f => f.id === payload.new.faculty_id);
+              if (localTeacher) {
+                teacherName = localTeacher.name;
+              } else {
+                const { data } = await supabase.from('faculty_members').select('name').eq('id', payload.new.faculty_id).single();
+                if (data) teacherName = data.name;
+              }
             }
 
-            if (Notification.permission === 'granted') {
-              try {
-                new Notification(`⚠️ Alerta de Retraso`, {
-                  body: `${teacherName} llegó tarde justo ahora.`,
-                  icon: '/vite.svg'
-                });
-                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                audio.play().catch(e => console.log('Audio blocked', e));
-              } catch (nError) {
-                console.error('Error notif:', nError);
+            // 1. Notificación tipo Toast (UI interna)
+            if (payload.eventType === 'INSERT') {
+              showNotification(`${teacherName} marcó ENTRADA`, 'info');
+            } else if (payload.eventType === 'UPDATE' && payload.new.check_out) {
+              showNotification(`${teacherName} marcó SALIDA`, 'success');
+            }
+
+            // 2. Alertas de Escritorio y Sonido (Solo para retardos)
+            if (payload.eventType === 'INSERT' && payload.new.status === 'Tarde') {
+              if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                try {
+                  new Notification(`⚠️ Alerta de Retraso`, {
+                    body: `${teacherName} llegó tarde justo ahora.`,
+                    icon: '/vite.svg'
+                  });
+                  const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                  audio.play().catch(e => console.log('Audio blocked', e));
+                } catch (err) { console.error(err); }
               }
-              showNotification(`Alerta: ${teacherName} llegó tarde`, 'warning');
+              showNotification(`⚠️ RETRASO: ${teacherName} llegó tarde`, 'warning');
             }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Estado suscripción Realtime:', status);
+      });
+
+    // Solicitar permiso de notificaciones por separado si están habilitadas
+    if (systemSettings.notificationsEnabled && typeof Notification !== 'undefined') {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(subscription);
     };
   }, [systemSettings.notificationsEnabled, facultyMembers]);
   // Cargar datos desde Supabase
