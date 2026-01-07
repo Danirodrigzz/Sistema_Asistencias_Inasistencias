@@ -653,7 +653,68 @@ select {
   }
 
   .logo-text {
-    font-size: 1rem !important;
+    font-size: 1.25rem;
+  }
+
+  /* Mejora de tablas para móviles: Estilo "Stacked Card" */
+  .table-responsive {
+    overflow-x: visible;
+  }
+
+  .table-responsive table,
+  .table-responsive thead,
+  .table-responsive tbody,
+  .table-responsive th,
+  .table-responsive td,
+  .table-responsive tr {
+    display: block;
+  }
+
+  .table-responsive thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .table-responsive tr {
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 16px;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  }
+
+  .table-responsive td {
+    border: none;
+    position: relative;
+    padding: 0.5rem 0 0.5rem 45% !important;
+    text-align: right;
+    min-height: 2.5rem;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-bottom: 1px solid #f9f9f9;
+  }
+
+  .table-responsive td:last-child {
+    border-bottom: none;
+  }
+
+  .table-responsive td:before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 40%;
+    padding-right: 10px;
+    white-space: nowrap;
+    text-align: left;
+    font-weight: 700;
+    content: attr(data-label);
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
   }
 
   .main-content {

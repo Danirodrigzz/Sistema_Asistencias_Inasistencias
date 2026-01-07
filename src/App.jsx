@@ -1150,17 +1150,17 @@ const TeacherDashboard = ({ onLogout, user }) => {
                       <tbody>
                         {myJustifications.map(j => (
                           <tr key={j?.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>
+                            <td data-label="Fecha" style={{ padding: '0.75rem 0.5rem', fontWeight: 700 }}>
                               {j?.absence_date ? new Date(j.absence_date + 'T12:00:00').toLocaleDateString('es-VE') : '-'}
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600, color: 'var(--secondary)' }}>{j?.chair || '-'}</td>
-                            <td style={{ padding: '0.75rem 0.5rem' }}>
+                            <td data-label="Cátedra" style={{ padding: '0.75rem 0.5rem', fontWeight: 600, color: 'var(--secondary)' }}>{j?.chair || '-'}</td>
+                            <td data-label="Estado" style={{ padding: '0.75rem 0.5rem' }}>
                               <span className={`badge ${(j?.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
                                 (j?.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
                                   'badge-warning'}`}>{j?.status || 'Pendiente'}</span>
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem' }}>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <td data-label="Detalle" style={{ padding: '0.75rem 0.5rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'inherit' }}>
                                 {j?.file_url && (
                                   <button
                                     onClick={() => handleViewFile(j.file_url)}
@@ -2488,14 +2488,14 @@ const AdminDashboard = ({ onLogout, user }) => {
                       <tbody>
                         {filteredFaculty.map(f => (
                           <tr key={f.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '1rem' }}>
+                            <td data-label="Profesor" style={{ padding: '1rem' }}>
                               <div style={{ fontWeight: 700 }}>{f.name}</div>
                               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{f.email}</div>
                             </td>
-                            <td style={{ padding: '1rem' }}>{f.chair}</td>
-                            <td style={{ padding: '1rem', fontWeight: 600 }}>{f.entry}</td>
-                            <td style={{ padding: '1rem', fontWeight: 600 }}>{f.exit}</td>
-                            <td style={{ padding: '1rem' }}>
+                            <td data-label="Cátedra" style={{ padding: '1rem' }}>{f.chair}</td>
+                            <td data-label="Entrada" style={{ padding: '1rem', fontWeight: 600 }}>{f.entry}</td>
+                            <td data-label="Salida" style={{ padding: '1rem', fontWeight: 600 }}>{f.exit}</td>
+                            <td data-label="Estado" style={{ padding: '1rem' }}>
                               <span className={`badge ${f.status === 'Presente' || f.status === 'A tiempo' ? 'badge-success' :
                                 f.status === 'Tarde' || f.status === 'Retraso' ? 'badge-warning' :
                                   'badge-danger'
@@ -3207,15 +3207,15 @@ const AdminDashboard = ({ onLogout, user }) => {
                   <tbody>
                     {justificationsList.map(j => (
                       <tr key={j.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                        <td style={{ padding: '1.5rem' }}>
+                        <td data-label="Profesor" style={{ padding: '1.5rem' }}>
                           <div style={{ fontWeight: 700 }}>{j.professor}</div>
                         </td>
-                        <td style={{ padding: '1.5rem', fontWeight: 600 }}>{j.date}</td>
-                        <td style={{ padding: '1.5rem', fontWeight: 600, color: 'var(--secondary)' }}>{j.chair || '-'}</td>
-                        <td style={{ padding: '1.5rem', maxWidth: '300px' }}>
+                        <td data-label="Fecha" style={{ padding: '1.5rem', fontWeight: 600 }}>{j.date}</td>
+                        <td data-label="Cátedra" style={{ padding: '1.5rem', fontWeight: 600, color: 'var(--secondary)' }}>{j.chair || '-'}</td>
+                        <td data-label="Motivo" style={{ padding: '1.5rem', maxWidth: '300px' }}>
                           <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', opacity: 0.8 }}>{j.reason}</div>
                         </td>
-                        <td style={{ padding: '1.5rem' }}>
+                        <td data-label="Adjunto" style={{ padding: '1.5rem' }}>
                           {j.file_url ? (
                             <button
                               onClick={() => handleViewFile(j.file_url)}
@@ -3241,7 +3241,7 @@ const AdminDashboard = ({ onLogout, user }) => {
                             <span className="text-muted" style={{ fontSize: '0.8rem' }}>Sin adjunto</span>
                           )}
                         </td>
-                        <td style={{ padding: '1.5rem' }}>
+                        <td data-label="Estado" style={{ padding: '1.5rem' }}>
                           <span className={`badge ${(j.status || '').toLowerCase().includes('aprob') ? 'badge-success' :
                             (j.status || '').toLowerCase().includes('rechaz') ? 'badge-danger' :
                               'badge-warning'
