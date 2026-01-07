@@ -628,6 +628,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
         {
           faculty_id: teacherProfile.id,
           absence_date: justificationDate,
+          date: justificationDate, // Añadimos esta línea para cumplir con la restricción de la base de datos
           chair: justificationChair,
           reason: justificationReason,
           status: 'Pendiente',
