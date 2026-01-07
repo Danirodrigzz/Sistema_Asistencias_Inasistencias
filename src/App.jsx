@@ -675,17 +675,16 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 className="brand-font" style={{ fontSize: '2rem' }}>Mi Historial</h2>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div className="glass" style={{ padding: '0.6rem 1.2rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '0.8rem', width: '300px' }}>
-                  <Search size={18} className="text-terracotta" style={{ opacity: 0.7 }} />
+            <div className="section-header-mobile" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 className="brand-font" style={{ fontSize: '2.5rem', margin: 0 }}>Mi Historial</h2>
+              <div style={{ display: 'flex', gap: '1rem', flex: '1', justifyContent: 'flex-end', minWidth: '300px' }}>
+                <div className="search-bar-premium" style={{ maxWidth: '350px' }}>
+                  <Search size={20} className="text-terracotta" />
                   <input
                     type="text"
                     placeholder="Buscar por fecha o cátedra..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    style={{ border: 'none', background: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', fontWeight: 500 }}
                   />
                 </div>
 
@@ -693,25 +692,11 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <div style={{ position: 'relative' }}>
                   <button
                     onClick={() => setShowHistoryFilter(!showHistoryFilter)}
-                    className="glass"
-                    style={{
-                      padding: '0.6rem 1.2rem',
-                      borderRadius: '14px',
-                      border: '1px solid rgba(0,0,0,0.05)',
-                      outline: 'none',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      minWidth: '180px',
-                      justifyContent: 'space-between',
-                      background: 'white'
-                    }}
+                    className="custom-select-button"
+                    style={{ minWidth: '180px', padding: '0.8rem 1.2rem' }}
                   >
-                    <span>{historyStatusFilter === 'Todos' ? 'Todos los Estados' : historyStatusFilter}</span>
-                    <ChevronDown size={16} style={{ transform: showHistoryFilter ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
+                    <span>{historyStatusFilter === 'Todos' ? 'Estados' : historyStatusFilter}</span>
+                    <ChevronDown size={18} style={{ transform: showHistoryFilter ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
                   </button>
 
                   <AnimatePresence>
@@ -811,17 +796,16 @@ const TeacherDashboard = ({ onLogout, user }) => {
 
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <h2 className="brand-font" style={{ fontSize: '2rem', margin: 0 }}>Próximas Clases</h2>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '1', justifyContent: 'flex-end', minWidth: '280px' }}>
-                <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1.2rem', borderRadius: '16px', flex: '1', maxWidth: '400px' }}>
-                  <Search size={18} className="text-forest" />
+            <div className="section-header-mobile" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <h2 className="brand-font" style={{ fontSize: '2.5rem', margin: 0 }}>Próximas Clases</h2>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '1', justifyContent: 'flex-end', minWidth: '300px' }}>
+                <div className="search-bar-premium" style={{ maxWidth: '350px' }}>
+                  <Search size={20} className="text-forest" />
                   <input
                     type="text"
                     placeholder="Buscar cátedra..."
                     value={scheduleSearch}
                     onChange={(e) => setScheduleSearch(e.target.value)}
-                    style={{ border: 'none', background: 'none', marginLeft: '0.8rem', outline: 'none', width: '100%', fontWeight: 500 }}
                   />
                 </div>
 
@@ -829,25 +813,11 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <div style={{ position: 'relative' }}>
                   <button
                     onClick={() => setShowScheduleFilter(!showScheduleFilter)}
-                    className="glass"
-                    style={{
-                      padding: '0.6rem 1.2rem',
-                      borderRadius: '16px',
-                      border: '1px solid rgba(0,0,0,0.05)',
-                      outline: 'none',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      minWidth: '200px',
-                      justifyContent: 'space-between',
-                      background: 'white'
-                    }}
+                    className="custom-select-button"
+                    style={{ minWidth: '180px', padding: '0.8rem 1.2rem' }}
                   >
-                    <span>{scheduleTypeFilter === 'Todos' ? 'Todas las Modalidades' : scheduleTypeFilter}</span>
-                    <ChevronDown size={16} style={{ transform: showScheduleFilter ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
+                    <span>{scheduleTypeFilter === 'Todos' ? 'Modalidades' : scheduleTypeFilter}</span>
+                    <ChevronDown size={18} style={{ transform: showScheduleFilter ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
                   </button>
 
                   <AnimatePresence>
@@ -934,31 +904,20 @@ const TeacherDashboard = ({ onLogout, user }) => {
                 <h3 style={{ marginBottom: '1.5rem' }}>Nueva Solicitud</h3>
                 <div className="input-group">
                   <label>Fecha de Ausencia</label>
-                  <input type="date" />
+                  <div className="date-input-wrapper">
+                    <Calendar className="calendar-icon" size={20} />
+                    <input type="date" />
+                  </div>
                 </div>
                 <div className="input-group">
                   <label>Cátedra</label>
                   <div style={{ position: 'relative' }}>
                     <button
                       onClick={() => setShowJustifyChair(!showJustifyChair)}
-                      className="glass"
-                      style={{
-                        width: '100%',
-                        padding: '0.9rem 1.2rem',
-                        borderRadius: '14px',
-                        border: '1px solid rgba(0,0,0,0.1)',
-                        background: 'white',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: 'var(--text-main)'
-                      }}
+                      className="custom-select-button"
                     >
                       <span>{justificationChair || 'Seleccionar Cátedra'}</span>
-                      <ChevronDown size={18} style={{ transform: showJustifyChair ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
+                      <ChevronDown size={22} style={{ color: 'var(--primary)', transform: showJustifyChair ? 'rotate(180deg)' : 'none', transition: '0.3s' }} />
                     </button>
                     <AnimatePresence>
                       {showJustifyChair && (
