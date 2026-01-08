@@ -2272,19 +2272,13 @@ const AdminDashboard = ({ onLogout, user }) => {
               </div>
 
               <div className="table-responsive">
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(6, minmax(150px, 1fr))',
-                  gap: '0.6rem',
-                  width: '100%',
-                  minWidth: '900px' // Ensure enough space for the 6 columns
-                }}>
+                <div className="master-schedule-grid">
                   {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(day => (
                     <div key={day} style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '0.75rem',
-                      minWidth: 0 // Prevent grid item overflow
+                      gap: '1rem',
+                      minWidth: 0
                     }}>
                       <div style={{
                         background: 'var(--bg-cream)',

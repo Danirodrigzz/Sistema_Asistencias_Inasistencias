@@ -318,6 +318,42 @@ select {
   width: 100%;
   overflow-x: auto;
   border-radius: 20px;
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.table-responsive::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}
+
+.master-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  min-width: 1000px;
+}
+
+@media screen and (max-width: 1200px) {
+  .master-schedule-grid {
+    min-width: 0;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .master-schedule-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .master-schedule-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
 }
 
 /* Mobile Menu */
