@@ -725,4 +725,30 @@ select {
   section {
     margin-bottom: 2rem !important;
   }
+}.horizontal-scroll-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Suavidad en iOS */
+    padding-bottom: 0.5rem;
+    border-radius: 20px;
+}
+
+/* Estilizar la barra de desplazamiento solo para esto si se desea, o dejar nativa */
+.horizontal-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.horizontal-scroll-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+}
+
+.horizontal-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(212, 122, 77, 0.3);
+    border-radius: 4px;
+}
+
+.horizontal-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(212, 122, 77, 0.5);
 }

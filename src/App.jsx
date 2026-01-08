@@ -2271,7 +2271,7 @@ const AdminDashboard = ({ onLogout, user }) => {
                 </div>
               </div>
 
-              <div className="table-responsive">
+              <div className="horizontal-scroll-container">
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(6, minmax(150px, 1fr))',
