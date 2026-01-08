@@ -153,6 +153,157 @@ const formatDateVE = (isoStr) => {
   }
 };
 
+const PasswordResetModal = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    // 1. Listen to Supabase auth events (Official and safest way)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth Event:", event);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsOpen(true);
+      }
+    });
+
+    // 2. Listen for manual trigger (for profile/menu usage)
+    const manualListener = () => {
+      setIsOpen(true);
+    };
+    window.addEventListener('manual-recovery-trigger', manualListener);
+
+    return () => {
+      subscription?.unsubscribe();
+      window.removeEventListener('manual-recovery-trigger', manualListener);
+    };
+  }, []);
+
+  const handlePasswordUpdate = async () => {
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Las contraseñas no coinciden' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setMessage({ type: 'success', text: '¡Contraseña actualizada correctamente!' });
+      setTimeout(() => setIsOpen(false), 2000);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}
+      onClick={() => setIsOpen(false)}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="card"
+        style={{ maxWidth: '420px', width: '90%', padding: '2.5rem', textAlign: 'center', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', background: 'white', borderRadius: '24px', position: 'relative' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Botón cerrar */}
+        <button
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px',
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+        >
+          <X size={20} color="#666" />
+        </button>
+
+        <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '70px', height: '70px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+          <ShieldCheck size={36} className="text-terracotta" style={{ color: '#D47A4D' }} />
+        </div>
+        <h3 className="brand-font" style={{ fontSize: '1.8rem', marginBottom: '1rem', color: '#1B4332' }}>Restablecer Contraseña</h3>
+        <p className="text-muted" style={{ marginBottom: '2rem', color: '#666' }}>Por seguridad, ingresa una nueva contraseña.</p>
+
+        <div style={{ marginBottom: '1rem', textAlign: 'left' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem', color: '#333' }}>Nueva Contraseña</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showNewPassword ? "text" : "password"}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              style={{ width: '100%', padding: '1rem', paddingRight: '2.5rem', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1rem' }}
+              placeholder="Min. 6 caracteres"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword(!showNewPassword)}
+              style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }}
+            >
+              {showNewPassword ? <EyeOff size={20} color="#888" /> : <Eye size={20} color="#888" />}
+            </button>
+          </div>
+        </div>
+        <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+          <label style={{ fontSize: '0.9rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem', color: '#333' }}>Confirmar Contraseña</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={{ width: '100%', padding: '1rem', paddingRight: '2.5rem', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1rem' }}
+              placeholder="Repite tu contraseña"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '5px' }}
+            >
+              {showConfirmPassword ? <EyeOff size={20} color="#888" /> : <Eye size={20} color="#888" />}
+            </button>
+          </div>
+        </div>
+
+        {message && (
+          <div style={{ padding: '0.8rem', borderRadius: '12px', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 600, background: message.type === 'error' ? 'rgba(220, 38, 38, 0.1)' : 'rgba(22, 163, 74, 0.1)', color: message.type === 'error' ? '#DC2626' : '#16A34A' }}>
+            {message.text}
+          </div>
+        )}
+
+        <button className="btn-primary" onClick={handlePasswordUpdate} disabled={loading} style={{ width: '100%', justifyContent: 'center', background: '#D47A4D', color: 'white', padding: '1rem', borderRadius: '12px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
+          {loading ? 'Actualizando...' : 'Guardar Nueva Contraseña'}
+        </button>
+      </motion.div>
+    </div>
+  );
+};
+
 const getLongDateVE = (date) => {
   if (!date || isNaN(date.getTime())) return "";
   const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -181,7 +332,7 @@ const LoginPage = ({ onLogin }) => {
     setError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: window.location.origin
+        redirectTo: 'http://localhost:5173/'
       });
       if (error) throw error;
       setError('¡Correo enviado! Revisa tu bandeja de entrada para recuperación de contraseña.');
@@ -445,6 +596,7 @@ const LoginPage = ({ onLogin }) => {
           </div>
         )}
       </AnimatePresence>
+      <PasswordResetModal />
     </div>
   );
 };
@@ -1258,6 +1410,89 @@ const TeacherDashboard = ({ onLogout, user }) => {
             </div>
           </div>
         );
+      case 'profile':
+        return (
+          <div style={{ paddingBottom: '2rem' }}>
+            <h2 className="brand-font" style={{ fontSize: '2rem', marginBottom: '2rem' }}>Mi Perfil</h2>
+            <div className="grid-cols-2" style={{ gap: '2rem' }}>
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D47A4D 0%, #1B4332 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 'bold', color: 'white' }}>
+                    {teacherProfile?.name?.charAt(0) || 'P'}
+                  </div>
+                  <div>
+                    <h3 className="brand-font" style={{ fontSize: '1.5rem', marginBottom: '0.3rem' }}>{teacherProfile?.name || 'Profesor'}</h3>
+                    <p className="text-muted" style={{ fontSize: '0.9rem' }}>Docente - J. M. Olivares</p>
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', fontWeight: 700 }}>Información Personal</h4>
+
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#888', display: 'block', marginBottom: '0.5rem' }}>Correo Electrónico</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <Mail size={18} color="#D47A4D" />
+                      <span style={{ fontSize: '1rem', fontWeight: 600 }}>{teacherProfile?.email || user?.email || '-'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#888', display: 'block', marginBottom: '0.5rem' }}>Teléfono</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <Phone size={18} color="#D47A4D" />
+                      <span style={{ fontSize: '1rem', fontWeight: 600 }}>{teacherProfile?.phone || '-'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#888', display: 'block', marginBottom: '0.5rem' }}>Cátedra Principal</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <Music size={18} color="#D47A4D" />
+                      <span style={{ fontSize: '1rem', fontWeight: 600 }}>{teacherProfile?.chair || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', fontWeight: 700 }}>Seguridad</h4>
+
+                <div style={{ background: 'rgba(212, 122, 77, 0.05)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                    <ShieldCheck size={24} color="#D47A4D" />
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>Contraseña</p>
+                      <p className="text-muted" style={{ fontSize: '0.85rem' }}>Última actualización: ••••••••</p>
+                    </div>
+                  </div>
+                  <button
+                    className="btn-primary"
+                    onClick={() => window.dispatchEvent(new Event('manual-recovery-trigger'))}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '1rem' }}
+                  >
+                    <ShieldCheck size={18} />
+                    Cambiar Contraseña
+                  </button>
+                </div>
+
+                <div style={{ background: '#f8f9fa', padding: '1.5rem', borderRadius: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem' }}>
+                    <AlertCircle size={20} color="#666" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: '#333' }}>Recomendaciones de Seguridad</p>
+                      <ul style={{ fontSize: '0.85rem', color: '#666', paddingLeft: '1.2rem', margin: 0 }}>
+                        <li>Usa una contraseña única y segura</li>
+                        <li>Nunca compartas tu contraseña</li>
+                        <li>Cambia tu contraseña cada 3 meses</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
       default: return null;
     }
   };
@@ -1306,6 +1541,13 @@ const TeacherDashboard = ({ onLogout, user }) => {
             <History size={20} /> Mi Historial
           </a>
           <div style={{ marginTop: 'auto' }}>
+            <a href="#" className={`nav-link ${activeTab === 'profile' ? 'active' : ''}`} onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('profile');
+              setIsSidebarOpen(false);
+            }}>
+              <User size={20} /> Mi Perfil
+            </a>
             <a href="#" className="nav-link" onClick={() => setShowLogoutModal(true)}>
               <LogOut size={20} /> Salir
             </a>
@@ -1428,6 +1670,7 @@ const AdminDashboard = ({ onLogout, user }) => {
   const [showModal, setShowModal] = useState(false);
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
   const [facultySearch, setFacultySearch] = useState('');
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [facultyStatusFilter, setFacultyStatusFilter] = useState('Todos');
   const [showActionsMenu, setShowActionsMenu] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(null);
@@ -4552,12 +4795,31 @@ const AdminDashboard = ({ onLogout, user }) => {
 
               <div className="input-group">
                 <label>Contraseña Temporal</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={newUserForm.password}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNewUserPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={newUserForm.password}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                    style={{ paddingRight: '2.5rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.8rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)'
+                    }}
+                  >
+                    {showNewUserPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
               <div className="input-group">
@@ -4960,6 +5222,15 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
+    // Check if coming from recovery link (Safe Delayed Trigger)
+    if (window.location.hash && (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery'))) {
+      console.log("App: Recovery hash detected! Scheduling modal open...");
+      setTimeout(() => {
+        console.log("App: Firing delayed recovery trigger");
+        window.dispatchEvent(new Event('manual-recovery-trigger'));
+      }, 1000); // 1s delay to ensure TeacherDashboard is mounted
+    }
+
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -4973,7 +5244,13 @@ function App() {
     });
 
     // Listen to changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Force pass recovery event if detected at this level
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("App Level: PASSWORD_RECOVERY detected! Dispatching manual trigger...");
+        window.dispatchEvent(new Event('manual-recovery-trigger'));
+      }
+
       if (session) {
         setUser(session.user);
         const role = session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher';
@@ -5001,11 +5278,14 @@ function App() {
   }
 
   return (
-    <AnimatePresence mode="wait">
-      {view === 'login' && <LoginPage key="login" onLogin={handleLogin} />}
-      {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} />}
-      {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} user={user} />}
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait">
+        {view === 'login' && <LoginPage key="login" onLogin={handleLogin} />}
+        {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} />}
+        {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} user={user} />}
+      </AnimatePresence>
+      <PasswordResetModal />
+    </>
   );
 }
 
