@@ -313,7 +313,7 @@ const getLongDateVE = (date) => {
 
 // --- Components ---
 
-const LoginPage = ({ onLogin }) => {
+const LoginPage = ({ onLogin, systemSettings }) => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -406,7 +406,7 @@ const LoginPage = ({ onLogin }) => {
             <Music2 size={40} className={isAdminMode ? 'text-forest' : 'text-terracotta'} />
           </div>
           <h1 className="brand-font" style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>
-            {isAdminMode ? 'Directivo' : 'Conservatorio'}
+            {isAdminMode ? 'Directivo' : (systemSettings?.institutionName || 'Conservatorio')}
           </h1>
           <p className="text-muted" style={{ fontSize: '0.9rem' }}>
             {isAdminMode ? 'Portal de Gestión Administrativa' : 'Sistema de Asistencia Docente'}
@@ -601,7 +601,7 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
-const TeacherDashboard = ({ onLogout, user }) => {
+const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
   const [activeTab, setActiveTab] = useState('attendance');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [time, setTime] = useState(new Date());
@@ -775,17 +775,31 @@ const TeacherDashboard = ({ onLogout, user }) => {
             if (ampm === 'PM' && schedHour !== 12) schedHour += 12;
             if (ampm === 'AM' && schedHour === 12) schedHour = 0;
 
-            const totalSchedMinutes = (schedHour * 60) + schedMin + 15;
+            const toleranceMinutes = parseInt(systemSettings?.tolerance || '15');
+            const totalSchedMinutes = (schedHour * 60) + schedMin + toleranceMinutes;
             const totalNowMinutes = (currentHour * 60) + currentMinute;
 
             if (totalNowMinutes > totalSchedMinutes) {
               status = 'Tarde';
               statusReason = `Llegada después de las ${firstClass.time}`;
-
-              statusReason = `Llegada después de las ${firstClass.time}`;
             } else {
               statusReason = 'Llegada a tiempo';
             }
+          }
+        } else {
+          // Si no tiene clases programadas, comparar con la hora de apertura del sistema
+          const openingTime = systemSettings?.openingTime || '07:00';
+          const [openHour, openMin] = openingTime.split(':').map(Number);
+          const toleranceMinutes = parseInt(systemSettings?.tolerance || '15');
+          const totalOpenMinutes = (openHour * 60) + openMin + toleranceMinutes;
+          const totalNowMinutes = (currentHour * 60) + currentMinute;
+
+          if (totalNowMinutes > totalOpenMinutes) {
+            status = 'Tarde';
+            statusReason = `Llegada después de la apertura (${openingTime})`;
+          } else {
+            status = 'Presente';
+            statusReason = 'Llegada antes/hora de apertura (Sin clases hoy)';
           }
         }
         console.log(`[DEBUG] Clases hoy: ${todaysClasses.length}, Status: ${status}, Motivo: ${statusReason}`);
@@ -1515,7 +1529,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
           <div className="logo-container" style={{ marginBottom: 0 }}>
             <Music2 size={32} color="var(--primary)" />
             <div>
-              <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>J. M. Olivares</span>
+              <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>{systemSettings?.institutionName || 'J. M. Olivares'}</span>
               <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Docente</span>
             </div>
           </div>
@@ -1665,7 +1679,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
   );
 };
 
-const AdminDashboard = ({ onLogout, user }) => {
+const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, updateSystemSettings }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showModal, setShowModal] = useState(false);
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
@@ -1699,13 +1713,12 @@ const AdminDashboard = ({ onLogout, user }) => {
     phone: '',
     chair: ''
   });
-  const [systemSettings, setSystemSettings] = useState({
-    institutionName: 'Conservatorio de Música Juan Manuel Olivares',
-    openingTime: '07:00',
-    tolerance: '15',
-    notificationsEnabled: true,
-    backupEmail: 'sistemas@olivares.edu.ve'
-  });
+  const [systemSettings, setSystemSettings] = useState(globalSettings);
+
+  useEffect(() => {
+    setSystemSettings(globalSettings);
+  }, [globalSettings]);
+
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
   const [chairsViewMode, setChairsViewMode] = useState('list');
@@ -2414,22 +2427,11 @@ const AdminDashboard = ({ onLogout, user }) => {
   };
 
   const handleSaveSettings = async () => {
-    try {
-      const { error } = await supabase.from('system_settings').upsert({
-        id: 1, // Siempre fila 1
-        institution_name: systemSettings.institutionName,
-        opening_time: systemSettings.openingTime,
-        tolerance_minutes: parseInt(systemSettings.tolerance),
-        notifications_enabled: systemSettings.notificationsEnabled,
-        backup_email: systemSettings.backupEmail,
-        updated_at: new Date()
-      });
-
-      if (error) throw error;
+    const result = await updateSystemSettings(systemSettings);
+    if (result.success) {
       showNotification('Configuración guardada exitosamente', 'success');
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Error al guardar configuración: ' + error.message);
+    } else {
+      alert('Error al guardar configuración: ' + result.error);
     }
   };
 
@@ -3944,12 +3946,11 @@ const AdminDashboard = ({ onLogout, user }) => {
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="brand-font" style={{ fontSize: '2rem', marginBottom: '2rem' }}>Configuración del Sistema</h2>
             <div className="settings-layout" style={{ gap: '2rem' }}>
-              <div className="settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'sticky', top: '2rem' }}>
                 {[
                   { id: 'General', icon: <Globe size={18} /> },
                   { id: 'Notificaciones', icon: <BellRing size={18} /> },
-                  { id: 'Seguridad', icon: <ShieldCheck size={18} /> },
-                  { id: 'Dispositivos', icon: <Smartphone size={18} /> }
+                  { id: 'Seguridad', icon: <ShieldCheck size={18} /> }
                 ].map(item => (
                   <button
                     key={item.id}
@@ -4115,44 +4116,6 @@ const AdminDashboard = ({ onLogout, user }) => {
                       </div>
                     </motion.div>
                   )}
-
-                  {settingsTab === 'Dispositivos' && (
-                    <motion.div
-                      key="devices"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                    >
-                      <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <Smartphone size={20} className="text-forest" /> Dispositivos Conectados
-                      </h3>
-
-                      <div className="card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', border: '1px solid var(--success)', background: 'rgba(27, 67, 50, 0.02)', flexWrap: 'wrap' }}>
-                        <div style={{ padding: '1rem', background: 'white', borderRadius: '50%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                          <Globe size={32} className="text-forest" />
-                        </div>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                          <h4 style={{ marginBottom: '0.25rem' }}>Sesión Actual</h4>
-                          <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-                            {navigator.userAgent.includes("Windows") ? "Windows PC" : "Dispositivo"} - {navigator.userAgent.includes("Chrome") ? "Google Chrome" : "Navegador Web"}
-                          </p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }}></div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: 600 }}>Activo ahora</span>
-                          </div>
-                        </div>
-                        <button className="btn-outline" style={{ fontSize: '0.85rem', width: '100%' }} disabled>
-                          Dispositivo Actual
-                        </button>
-                      </div>
-
-                      <h4 style={{ margin: '2rem 0 1rem 0', fontSize: '1rem', color: 'var(--text-muted)' }}>Otras sesiones recientes</h4>
-
-                      <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed rgba(0,0,0,0.1)' }}>
-                        <p>No se detectan otras sesiones activas.</p>
-                      </div>
-                    </motion.div>
-                  )}
                 </AnimatePresence>
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid rgba(0,0,0,0.05)', flexWrap: 'wrap' }}>
@@ -4207,7 +4170,7 @@ const AdminDashboard = ({ onLogout, user }) => {
           <div className="logo-container" style={{ marginBottom: 0 }}>
             <Music2 size={32} color="var(--primary)" />
             <div>
-              <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>J. M. Olivares</span>
+              <span className="logo-text" style={{ fontSize: '1.2rem', display: 'block' }}>{globalSettings?.institutionName || 'J. M. Olivares'}</span>
               <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Administrador</span>
             </div>
           </div>
@@ -5220,6 +5183,54 @@ function App() {
   const [view, setView] = useState('login');
   const [user, setUser] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [systemSettings, setSystemSettings] = useState({
+    institutionName: 'Conservatorio de Música Juan Manuel Olivares',
+    openingTime: '07:00',
+    tolerance: '15',
+    notificationsEnabled: true,
+    backupEmail: 'sistemas@olivares.edu.ve'
+  });
+
+  const fetchSystemSettings = async () => {
+    try {
+      const { data, error } = await supabase.from('system_settings').select('*').single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) {
+        setSystemSettings({
+          institutionName: data.institution_name,
+          openingTime: data.opening_time,
+          tolerance: data.tolerance_minutes.toString(),
+          notificationsEnabled: data.notifications_enabled,
+          backupEmail: data.backup_email
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
+
+  const updateSystemSettings = async (newSettings) => {
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert({
+          id: 1,
+          institution_name: newSettings.institutionName,
+          opening_time: newSettings.openingTime,
+          tolerance_minutes: parseInt(newSettings.tolerance),
+          notifications_enabled: newSettings.notificationsEnabled,
+          backup_email: newSettings.backupEmail,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      setSystemSettings(newSettings);
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating settings:', err);
+      return { success: false, error: err.message };
+    }
+  };
 
   useEffect(() => {
     // Check if coming from recovery link (Safe Delayed Trigger)
@@ -5238,6 +5249,7 @@ function App() {
         const role = session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher';
         setView(role);
       }
+      fetchSystemSettings(); // Cargar configuración al iniciar
       setIsInitializing(false);
     }).catch(() => {
       setIsInitializing(false);
@@ -5280,9 +5292,9 @@ function App() {
   return (
     <>
       <AnimatePresence mode="wait">
-        {view === 'login' && <LoginPage key="login" onLogin={handleLogin} />}
-        {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} />}
-        {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} user={user} />}
+        {view === 'login' && <LoginPage key="login" onLogin={handleLogin} systemSettings={systemSettings} />}
+        {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} systemSettings={systemSettings} />}
+        {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} user={user} systemSettings={systemSettings} updateSystemSettings={updateSystemSettings} />}
       </AnimatePresence>
       <PasswordResetModal />
     </>
