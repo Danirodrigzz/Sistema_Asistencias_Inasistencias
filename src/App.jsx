@@ -332,7 +332,7 @@ const LoginPage = ({ onLogin }) => {
     setError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: 'http://localhost:5173/'
+        redirectTo: 'https://sistema-asistencias-inasistencias.vercel.app/'
       });
       if (error) throw error;
       setError('¡Correo enviado! Revisa tu bandeja de entrada para recuperación de contraseña.');
