@@ -41,7 +41,8 @@ import {
   ChevronDown,
   Menu,
   Eye,
-  EyeOff
+  EyeOff,
+  FileText
 } from 'lucide-react'
 import {
   BarChart,
@@ -1414,6 +1415,9 @@ const AdminDashboard = ({ onLogout, user }) => {
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [monthlyReportData, setMonthlyReportData] = useState([]);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showReportMonthDropdown, setShowReportMonthDropdown] = useState(false);
+  const [showReportYearDropdown, setShowReportYearDropdown] = useState(false);
+  const [hasReportBeenGenerated, setHasReportBeenGenerated] = useState(false);
 
   // --- Effects ---
   useEffect(() => {
@@ -1825,37 +1829,41 @@ const AdminDashboard = ({ onLogout, user }) => {
   const handleFetchMonthlyReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const startDate = `${reportYear}-${reportMonth.toString().padStart(2, '0')}-01`;
+      // Definir rango de fechas
+      const startDate = `${reportYear}-${reportMonth.toString().padStart(2, '0')}-01T00:00:00`;
       const lastDay = new Date(reportYear, reportMonth, 0).getDate();
-      const endDate = `${reportYear}-${reportMonth.toString().padStart(2, '0')}-${lastDay}`;
+      const endDate = `${reportYear}-${reportMonth.toString().padStart(2, '0')}-${lastDay}T23:59:59`;
 
+      console.log('Fetching report for range:', startDate, 'to', endDate);
+
+      // Consulta de Asistencias
       const { data: attendanceData, error: attError } = await supabase
         .from('attendance')
-        .select(`
-          status,
-          date,
-          profile_id
-        `)
-        .gte('date', startDate)
-        .lte('date', endDate);
+        .select('status, check_in, faculty_id')
+        .gte('check_in', startDate)
+        .lte('check_in', endDate);
 
-      if (attError) throw attError;
+      if (attError) {
+        console.error('Attendance Query Error:', attError);
+        throw new Error(`Error en asistencia: ${attError.message}`);
+      }
 
+      // Consulta de Justificaciones
       const { data: justificationsData, error: justError } = await supabase
         .from('justifications')
-        .select(`
-          status,
-          date,
-          faculty_id
-        `)
+        .select('status, absence_date, faculty_id')
         .eq('status', 'Aprobada')
-        .gte('date', startDate)
-        .lte('date', endDate);
+        .gte('absence_date', startDate.split('T')[0])
+        .lte('absence_date', endDate.split('T')[0]);
 
-      if (justError) throw justError;
+      if (justError) {
+        console.error('Justifications Query Error:', justError);
+        throw new Error(`Error en justificaciones: ${justError.message}`);
+      }
 
       const reportMap = {};
 
+      // Inicializar mapa con la lista actual de facultades
       facultyMembers.forEach(f => {
         reportMap[f.id] = {
           id: f.id,
@@ -1868,8 +1876,9 @@ const AdminDashboard = ({ onLogout, user }) => {
         };
       });
 
+      // Procesar Asistencias
       attendanceData?.forEach(record => {
-        const profId = record.profile_id;
+        const profId = record.faculty_id;
         if (!reportMap[profId]) return;
 
         if (record.status === 'Presente' || record.status === 'A tiempo') {
@@ -1881,6 +1890,7 @@ const AdminDashboard = ({ onLogout, user }) => {
         }
       });
 
+      // Procesar Justificaciones
       justificationsData?.forEach(just => {
         const profId = just.faculty_id;
         if (reportMap[profId]) {
@@ -1889,10 +1899,16 @@ const AdminDashboard = ({ onLogout, user }) => {
       });
 
       setMonthlyReportData(Object.values(reportMap));
+      setHasReportBeenGenerated(true);
       showNotification('Datos del reporte cargados correctamente', 'success');
     } catch (error) {
-      console.error('Error fetching report:', error);
-      alert('Error al generar reporte: ' + error.message);
+      console.error('Detailed Report Error:', error);
+      // Si el error es "Failed to fetch", dar un mensaje más explicativo
+      if (error.message.includes('Failed to fetch')) {
+        alert('Error de conexión: No se pudo conectar con el servidor de Supabase. Verifica tu conexión a internet o si el proyecto está activo.');
+      } else {
+        alert('Error al generar reporte: ' + error.message);
+      }
     } finally {
       setIsGeneratingReport(false);
     }
@@ -3219,7 +3235,7 @@ const AdminDashboard = ({ onLogout, user }) => {
             )}
           </motion.div>
         );
-      case 'reports':
+      case 'reports': {
         const monthsNames = [
           'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -3251,84 +3267,258 @@ const AdminDashboard = ({ onLogout, user }) => {
               </button>
             </div>
 
-            <div className="card" style={{ padding: '2rem', marginBottom: '2.5rem' }}>
+            <div className="card" style={{ padding: '2rem', marginBottom: '2.5rem', overflow: 'visible' }}>
               <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '200px' }}>
+                {/* Custom Month Dropdown */}
+                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '220px', position: 'relative' }}>
                   <label>Seleccionar Mes</label>
-                  <select
-                    value={reportMonth}
-                    onChange={(e) => setReportMonth(parseInt(e.target.value))}
-                    style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd' }}
+                  <button
+                    onClick={() => {
+                      setShowReportMonthDropdown(!showReportMonthDropdown);
+                      setShowReportYearDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.9rem 1.25rem',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      background: 'white',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: 'var(--text-main)',
+                      transition: 'all 0.3s'
+                    }}
                   >
-                    {monthsNames.map((name, idx) => (
-                      <option key={idx} value={idx + 1}>{name}</option>
-                    ))}
-                  </select>
+                    <span>{monthsNames[reportMonth - 1]}</span>
+                    <ChevronDown size={18} style={{ transform: showReportMonthDropdown ? 'rotate(180deg)' : 'none', transition: '0.3s', color: 'var(--secondary)' }} />
+                  </button>
+
+                  <AnimatePresence>
+                    {showReportMonthDropdown && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 5 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          background: 'white',
+                          borderRadius: '16px',
+                          boxShadow: '0 15px 35px rgba(0,0,0,0.12)',
+                          border: '1px solid rgba(0,0,0,0.05)',
+                          zIndex: 100,
+                          padding: '0.5rem',
+                          maxHeight: '300px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {monthsNames.map((name, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setReportMonth(idx + 1);
+                              setShowReportMonthDropdown(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.8rem 1rem',
+                              border: 'none',
+                              background: reportMonth === idx + 1 ? 'rgba(212, 122, 77, 0.1)' : 'transparent',
+                              borderRadius: '10px',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              fontSize: '0.95rem',
+                              fontWeight: reportMonth === idx + 1 ? 700 : 500,
+                              color: reportMonth === idx + 1 ? 'var(--primary)' : 'var(--text-main)',
+                              transition: '0.2s'
+                            }}
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <div className="input-group" style={{ marginBottom: 0, flex: 1, minWidth: '150px' }}>
+
+                {/* Custom Year Dropdown */}
+                <div className="input-group" style={{ marginBottom: 0, flex: 0.5, minWidth: '150px', position: 'relative' }}>
                   <label>Año</label>
-                  <select
-                    value={reportYear}
-                    onChange={(e) => setReportYear(parseInt(e.target.value))}
-                    style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd' }}
+                  <button
+                    onClick={() => {
+                      setShowReportYearDropdown(!showReportYearDropdown);
+                      setShowReportMonthDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.9rem 1.25rem',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      background: 'white',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: 'var(--text-main)',
+                      transition: 'all 0.3s'
+                    }}
                   >
-                    {[2024, 2025, 2026].map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                    <span>{reportYear}</span>
+                    <ChevronDown size={18} style={{ transform: showReportYearDropdown ? 'rotate(180deg)' : 'none', transition: '0.3s', color: 'var(--secondary)' }} />
+                  </button>
+
+                  <AnimatePresence>
+                    {showReportYearDropdown && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 5 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          background: 'white',
+                          borderRadius: '16px',
+                          boxShadow: '0 15px 35px rgba(0,0,0,0.12)',
+                          border: '1px solid rgba(0,0,0,0.05)',
+                          zIndex: 100,
+                          padding: '0.5rem'
+                        }}
+                      >
+                        {[2024, 2025, 2026].map(y => (
+                          <button
+                            key={y}
+                            onClick={() => {
+                              setReportYear(y);
+                              setShowReportYearDropdown(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.8rem 1rem',
+                              border: 'none',
+                              background: reportYear === y ? 'rgba(212, 122, 77, 0.1)' : 'transparent',
+                              borderRadius: '10px',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              fontSize: '0.95rem',
+                              fontWeight: reportYear === y ? 700 : 500,
+                              color: reportYear === y ? 'var(--primary)' : 'var(--text-main)',
+                              transition: '0.2s'
+                            }}
+                          >
+                            {y}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
+
                 <button
                   className="btn-primary"
                   onClick={handleFetchMonthlyReport}
                   disabled={isGeneratingReport}
-                  style={{ padding: '0.8rem 2rem', borderRadius: '14px', height: 'fit-content' }}
+                  style={{
+                    padding: '0.95rem 2.5rem',
+                    borderRadius: '14px',
+                    height: 'fit-content',
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+                  }}
                 >
-                  {isGeneratingReport ? 'Procesando...' : 'Calcular Reporte'}
+                  {isGeneratingReport ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="spinner" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></div>
+                      Procesando...
+                    </div>
+                  ) : 'Calcular Reporte'}
                 </button>
               </div>
             </div>
 
-            {monthlyReportData.length > 0 ? (
-              <div className="card" style={{ padding: 0 }}>
-                <div style={{ padding: '1.5rem', borderBottom: '1px solid #eee' }}>
-                  <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Resultados para {monthsNames[reportMonth - 1]} {reportYear}</h3>
-                </div>
-                <div className="table-responsive">
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
-                        <th style={{ padding: '1.25rem 1.5rem' }}>Docente</th>
-                        <th style={{ padding: '1.25rem 1.5rem' }}>Cátedra</th>
-                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Asistencias</th>
-                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Retrasos</th>
-                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Faltas</th>
-                        <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Justificadas</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyReportData.map(row => (
-                        <tr key={row.id} style={{ borderBottom: '1px solid #fafafa' }}>
-                          <td data-label="Docente" style={{ padding: '1.25rem 1.5rem', fontWeight: 700 }}>{row.name}</td>
-                          <td data-label="Cátedra" style={{ padding: '1.25rem 1.5rem' }}>{row.chair}</td>
-                          <td data-label="Asistencias" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--forest)', fontWeight: 700 }}>{row.presents}</td>
-                          <td data-label="Retrasos" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--warning)', fontWeight: 700 }}>{row.delays}</td>
-                          <td data-label="Faltas" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{row.absences}</td>
-                          <td data-label="Justificadas" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: '#0ea5e9', fontWeight: 700 }}>{row.justified}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            {isGeneratingReport ? (
+              <div style={{ textAlign: 'center', padding: '5rem', background: 'white', borderRadius: '32px', border: '1px solid #f0f0f0' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid rgba(27, 67, 50, 0.1)', borderTopColor: 'var(--secondary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1.5rem auto' }}></div>
+                <h3 style={{ color: 'var(--secondary)' }}>Generando Reporte Estadístico...</h3>
+                <p className="text-muted">Cruzando datos de asistencia y justificaciones.</p>
               </div>
+            ) : hasReportBeenGenerated ? (
+              monthlyReportData.reduce((acc, curr) => acc + curr.presents + curr.delays + curr.absences + curr.justified, 0) > 0 ? (
+                <div className="card" style={{ padding: 0, animation: 'fadeIn 0.5s ease-out' }}>
+                  <div style={{ padding: '1.5rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: '1.2rem', margin: 0 }}>Resultados para {monthsNames[reportMonth - 1]} {reportYear}</h3>
+                    <div className="badge badge-success" style={{ padding: '0.4rem 0.8rem' }}>
+                      {monthlyReportData.length} Docentes Procesados
+                    </div>
+                  </div>
+                  <div className="table-responsive">
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid #eee' }}>
+                          <th style={{ padding: '1.25rem 1.5rem' }}>Docente</th>
+                          <th style={{ padding: '1.25rem 1.5rem' }}>Cátedra</th>
+                          <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Asis.</th>
+                          <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Retr.</th>
+                          <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Faltas</th>
+                          <th style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>Just.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlyReportData.map(row => (
+                          <tr key={row.id} style={{ borderBottom: '1px solid #fafafa' }}>
+                            <td data-label="Docente" style={{ padding: '1.25rem 1.5rem', fontWeight: 700 }}>{row.name}</td>
+                            <td data-label="Cátedra" style={{ padding: '1.25rem 1.5rem' }}>{row.chair}</td>
+                            <td data-label="Asis." style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--forest)', fontWeight: 700 }}>{row.presents}</td>
+                            <td data-label="Retr." style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--warning)', fontWeight: 700 }}>{row.delays}</td>
+                            <td data-label="Faltas" style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{row.absences}</td>
+                            <td data-label="Just." style={{ padding: '1.25rem 1.5rem', textAlign: 'center', color: '#0ea5e9', fontWeight: 700 }}>{row.justified}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '6rem 2rem', background: 'white', borderRadius: '32px', border: '2px dashed #eee', animation: 'fadeIn 0.5s ease-out' }}>
+                  <div style={{ background: '#fef2f2', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+                    <AlertCircle size={40} style={{ color: '#ef4444' }} />
+                  </div>
+                  <h3 style={{ color: 'var(--text-main)', fontSize: '1.6rem', marginBottom: '0.8rem' }}>Sin registros encontrados</h3>
+                  <p className="text-muted" style={{ maxWidth: '400px', margin: '0 auto', fontSize: '1.1rem', lineHeight: '1.5' }}>
+                    No hemos encontrado marcas de asistencia ni justificaciones aprobadas para <strong>{monthsNames[reportMonth - 1]} {reportYear}</strong>.
+                  </p>
+                  <button
+                    onClick={() => setHasReportBeenGenerated(false)}
+                    style={{ marginTop: '2rem', background: 'none', border: 'none', color: 'var(--secondary)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Volver a seleccionar
+                  </button>
+                </div>
+              )
             ) : (
-              <div style={{ textAlign: 'center', padding: '5rem', background: 'white', borderRadius: '32px', border: '1px dashed #ddd' }}>
-                <FileText size={50} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
-                <h3 style={{ color: 'var(--text-muted)' }}>No hay datos calculados</h3>
-                <p className="text-muted">Selecciona un mes y año para generar el reporte estadístico.</p>
+              <div style={{ textAlign: 'center', padding: '6rem 2rem', background: 'white', borderRadius: '32px', border: '1px solid #f8f8f8', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                <div style={{ background: 'var(--bg-cream)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+                  <Calendar size={40} style={{ color: 'var(--secondary)' }} />
+                </div>
+                <h3 style={{ color: 'var(--text-main)', fontSize: '1.6rem', marginBottom: '0.8rem' }}>Generador de Reportes</h3>
+                <p className="text-muted" style={{ maxWidth: '450px', margin: '0 auto', fontSize: '1.1rem' }}>
+                  Selecciona el periodo deseado arriba y presiona <strong>"Calcular Reporte"</strong> para analizar la actividad docente.
+                </p>
               </div>
             )}
           </motion.div>
         );
+      }
       case 'justifications':
         return (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
