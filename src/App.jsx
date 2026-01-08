@@ -169,6 +169,28 @@ const LoginPage = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) {
+      setError('Por favor ingresa tu correo electrónico');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: window.location.origin
+      });
+      if (error) throw error;
+      setError('¡Correo enviado! Revisa tu bandeja de entrada para recuperación de contraseña.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignIn = async () => {
     setLoading(true);
@@ -307,6 +329,26 @@ const LoginPage = ({ onLogin }) => {
           </div>
         </div>
 
+        <div style={{ textAlign: 'right', marginBottom: '1.5rem', marginTop: '-0.8rem' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowForgotPassword(true);
+              setError(null);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
+
         <button
           className="btn-primary"
           style={{
@@ -349,6 +391,60 @@ const LoginPage = ({ onLogin }) => {
           </button>
         </div>
       </motion.div>
+
+      {/* Forgot Password Modal */}
+      <AnimatePresence>
+        {showForgotPassword && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '400px', width: '90%', padding: '2.5rem' }}>
+              <h3 className="brand-font" style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Recuperar Contraseña</h3>
+              <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
+              </p>
+
+              <div className="input-group">
+                <label>Correo Electrónico</label>
+                <input
+                  type="email"
+                  placeholder="tucorreo@ejemplo.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              {error && error.includes('recuperación') && (
+                <div style={{ padding: '0.8rem', background: '#ecfdf5', color: '#047857', borderRadius: '12px', fontSize: '0.9rem', marginBottom: '1.5rem', border: '1px solid #a7f3d0' }}>
+                  {error}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '0.9rem' }}
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                >
+                  {loading ? 'Enviando...' : 'Enviar Enlace'}
+                </button>
+                <button
+                  className="btn-outline"
+                  style={{ flex: 1, padding: '0.9rem' }}
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setError(null);
+                    setForgotEmail('');
+                  }}
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -534,30 +630,7 @@ const TeacherDashboard = ({ onLogout, user }) => {
               status = 'Tarde';
               statusReason = `Llegada después de las ${firstClass.time}`;
 
-              // --- DISPARAR ALERTA SMS (Sin bloquear el flujo principal) ---
-              // Obtenemos token si es necesario, o llamamos directo si es pública/SERVICE_ROLE (mejor usar token de usuario)
-              supabase.auth.getSession().then(({ data: { session } }) => {
-                const token = session?.access_token;
-                const functionUrl = `${supabase.supabaseUrl}/functions/v1/send-sms-alert`;
-
-                fetch(functionUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                  },
-                  body: JSON.stringify({
-                    teacherName: teacherProfile.name,
-                    status: 'Tarde',
-                    time: formatTime12hShort(now),
-                    details: statusReason
-                  })
-                }).then(res => res.json())
-                  .then(data => console.log("Alerta SMS resultado:", data))
-                  .catch(err => console.error("Error enviando alerta SMS:", err));
-              });
-              // -----------------------------------------------------------
-
+              statusReason = `Llegada después de las ${firstClass.time}`;
             } else {
               statusReason = 'Llegada a tiempo';
             }
