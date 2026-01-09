@@ -2053,7 +2053,8 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
           password: facultyForm.password || 'Musica2026',
           name: facultyForm.name,
           chair: facultyForm.chair,
-          phone: facultyForm.phone
+          phone: facultyForm.phone,
+          role: 'teacher'
         }
       });
 
@@ -2121,27 +2122,22 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
 
     setLoading(true);
     try {
-      if (newUserForm.role === 'teacher') {
-        // Usar la misma lógica de invitación para docentes
+      if (newUserForm.role === 'teacher' || newUserForm.role === 'admin') {
         const { data, error: functionError } = await supabase.functions.invoke('invite-teacher', {
           body: {
             email: newUserForm.email,
             password: newUserForm.password,
             name: newUserForm.name,
             chair: newUserForm.chair || 'General',
-            phone: newUserForm.phone || '-'
+            phone: newUserForm.phone || '-',
+            role: newUserForm.role
           }
         });
 
         if (functionError) throw new Error(functionError.message);
-        if (data && data.success === false) throw new Error(data.error || 'Error al crear docente');
+        if (data && data.success === false) throw new Error(data.error || `Error al crear ${newUserForm.role}`);
 
-        showNotification('Docente creado e invitado correctamente');
-      } else {
-        // Lógica para crear Administrador (Simulado o real según backend)
-        // Por ahora simularemos la creación exitosa para la UI
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        showNotification('Administrador creado correctamente (Simulación)');
+        showNotification(`${newUserForm.role === 'admin' ? 'Administrador' : 'Docente'} creado correctamente`);
       }
 
       setShowAddUserModal(false);
@@ -3222,25 +3218,13 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                       </tr>
                     </thead>
                     <tbody>
-                      {/* Render Admin Row if matches filters */}
-                      {('Administrador Principal'.toLowerCase().includes(userSearch.toLowerCase()) || 'admin@conservatorio.ve'.includes(userSearch.toLowerCase())) &&
-                        (userRoleFilter === 'Todos' || userRoleFilter === 'Admin') && (
-                          <tr style={{ borderBottom: '1px solid #fafafa' }}>
-                            <td style={{ padding: '1rem' }}>
-                              <div style={{ fontWeight: 700 }}>Administrador Principal</div>
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>admin@conservatorio.ve</div>
-                            </td>
-                            <td style={{ padding: '1rem' }}><span className="badge badge-forest">Admin</span></td>
-                            <td style={{ padding: '1rem' }}><span className="badge badge-success">Activo</span></td>
-                            <td style={{ padding: '1rem' }}>-</td>
-                          </tr>
-                        )}
-
-                      {/* Render Filtered Faculty Members */}
+                      {/* Render All Members from Database */}
                       {facultyMembers
                         .filter(f => {
                           const matchesSearch = f.name.toLowerCase().includes(userSearch.toLowerCase()) || f.email.toLowerCase().includes(userSearch.toLowerCase());
-                          const matchesRole = userRoleFilter === 'Todos' || userRoleFilter === 'Docente';
+                          const matchesRole = userRoleFilter === 'Todos' ||
+                            (userRoleFilter === 'Admin' && f.role === 'admin') ||
+                            (userRoleFilter === 'Docente' && f.role === 'teacher');
                           return matchesSearch && matchesRole;
                         })
                         .map(f => (
@@ -3249,38 +3233,47 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                               <div style={{ fontWeight: 700 }}>{f.name}</div>
                               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{f.email}</div>
                             </td>
-                            <td style={{ padding: '1rem' }}><span className="badge badge-forest" style={{ background: 'rgba(212, 122, 77, 0.1)', color: 'var(--primary)' }}>Docente</span></td>
+                            <td style={{ padding: '1rem' }}>
+                              <span className={`badge ${f.role === 'admin' ? 'badge-forest' : ''}`}
+                                style={f.role !== 'admin' ? { background: 'rgba(212, 122, 77, 0.1)', color: 'var(--primary)' } : {}}>
+                                {f.role === 'admin' ? 'Admin' : 'Docente'}
+                              </span>
+                            </td>
                             <td style={{ padding: '1rem' }}>
                               <span className="badge badge-success">Activo</span>
                             </td>
                             <td style={{ padding: '1rem' }}>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button
-                                  onClick={() => {
-                                    setFacultyForm({
-                                      name: f.name,
-                                      email: f.email,
-                                      phone: f.phone,
-                                      chair: f.chair,
-                                      entry: f.entry,
-                                      exit: f.exit,
-                                      status: f.status,
-                                      justified: f.justified
-                                    });
-                                    setEditingFaculty(f);
-                                    setShowAddFacultyModal(true);
-                                  }}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--secondary)' }} title="Editar Usuario"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button
-                                  onClick={() => setShowDeleteModal(f)}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} title="Eliminar Usuario"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
+                              {f.email !== 'admin@conservatorio.ve' ? (
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button
+                                    onClick={() => {
+                                      setFacultyForm({
+                                        name: f.name,
+                                        email: f.email,
+                                        phone: f.phone,
+                                        chair: f.chair,
+                                        entry: f.entry,
+                                        exit: f.exit,
+                                        status: f.status,
+                                        justified: f.justified
+                                      });
+                                      setEditingFaculty(f);
+                                      setShowAddFacultyModal(true);
+                                    }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--secondary)' }} title="Editar Usuario"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => setShowDeleteModal(f)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} title="Eliminar Usuario"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sistema</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -5243,13 +5236,21 @@ function App() {
     }
 
     // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setUser(session.user);
-        const role = session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher';
+
+        // Consultar el rol real desde la base de datos
+        const { data: profile } = await supabase
+          .from('faculty_members')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        const role = profile?.role || (session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher');
         setView(role);
       }
-      fetchSystemSettings(); // Cargar configuración al iniciar
+      fetchSystemSettings();
       setIsInitializing(false);
     }).catch(() => {
       setIsInitializing(false);
@@ -5265,8 +5266,20 @@ function App() {
 
       if (session) {
         setUser(session.user);
-        const role = session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher';
-        setView(role);
+
+        // Consultar el rol al cambiar el estado de auth
+        const fetchRole = async () => {
+          const { data: profile } = await supabase
+            .from('faculty_members')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+          const role = profile?.role || (session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher');
+          setView(role);
+        };
+
+        fetchRole();
       } else {
         setUser(null);
         setView('login');

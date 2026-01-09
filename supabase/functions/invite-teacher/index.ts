@@ -33,16 +33,16 @@ Deno.serve(async (req: Request) => {
         }
 
         const supabaseClient = createClient(supabaseUrl, supabaseServiceKey)
-        const { email, password, name, chair, phone } = await req.json()
+        const { email, password, name, chair, phone, role = 'teacher' } = await req.json()
 
-        console.log(`Intentando crear usuario: ${email}`)
+        console.log(`Intentando crear usuario: ${email} con rol: ${role}`)
 
         // 1. Crear el usuario en Supabase Auth
         const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
             email,
             password,
             email_confirm: true,
-            user_metadata: { full_name: name, role: 'teacher' }
+            user_metadata: { full_name: name, role: role }
         })
 
         if (authError) {
@@ -67,6 +67,7 @@ Deno.serve(async (req: Request) => {
                     email,
                     chair,
                     phone,
+                    role,
                     status: 'Presente'
                 }
             ])
