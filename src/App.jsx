@@ -153,6 +153,37 @@ const formatDateVE = (isoStr) => {
   }
 };
 
+// --- Constantes de Validación ---
+const LIMITS = {
+  NAME: 50,
+  CHAIR: 60,
+  PHONE: 20,
+  REASON: 400,
+  ROOM: 30,
+  PASSWORD: 32
+};
+
+// --- Helpers de Validación ---
+const validateEmail = (email) => {
+  return String(email)
+    .toLowerCase()
+    .match(/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
+};
+
+const cleanPhone = (val) => {
+  // Solo permite números y el símbolo +
+  return val.replace(/[^0-9+]/g, '');
+};
+
+const cleanTime = (val) => {
+  // Permite números, :, espacio y letras (AM/PM)
+  return val.replace(/[^0-9: apmAPM]/g, '');
+};
+
+const cleanText = (val, limit) => {
+  return val.substring(0, limit);
+};
+
 const PasswordResetModal = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -712,6 +743,7 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
       const formattedHistory = (attendance || []).map(a => ({
         id: a.id,
         date: formatDateVE(a.check_in),
+        check_in_raw: a.check_in,
         chair: 'Clase Registrada',
         entry: formatTime12hShort(a.check_in),
         exit: formatTime12hShort(a.check_out),
@@ -742,6 +774,15 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
         const now = new Date();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
+
+        // 0. Bloqueo por Hora de Apertura
+        const openingTimeStr = systemSettings?.openingTime || '07:00';
+        const [openHour, openMin] = openingTimeStr.split(':').map(Number);
+
+        if (currentHour < openHour || (currentHour === openHour && currentMinute < openMin)) {
+          alert(`Entrada Bloqueada: El conservatorio aún no ha abierto. La hora de apertura es a las ${openingTimeStr}.`);
+          return;
+        }
 
         // 1. Buscar si el profesor tiene clases HOY para comparar la hora
         const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -831,10 +872,28 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
     }
   };
 
+
   const handleJustificationSubmit = async () => {
     if (!justificationDate || !justificationChair || !justificationReason) {
       showNotification('Por favor complete todos los campos obligatorios', 'error');
       return;
+    }
+
+    if (justificationReason.length > 500) {
+      showNotification('El motivo es muy largo (máximo 500 caracteres)', 'error');
+      return;
+    }
+
+    if (justificationFile) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      if (!allowedTypes.includes(justificationFile.type)) {
+        showNotification('Solo se permiten archivos de imagen (JPG, PNG, WebP)', 'error');
+        return;
+      }
+      if (justificationFile.size > 5 * 1024 * 1024) {
+        showNotification('La imagen es muy pesada (máximo 5MB)', 'error');
+        return;
+      }
     }
 
     setSubmittingJustification(true);
@@ -995,20 +1054,75 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <AlertCircle className="text-warning" /> Alertas Pendientes
                 </h3>
-                {myAttendance.filter(a => a.status === 'Ausente').length > 0 ? (
-                  <div className="glass" style={{ border: '1px solid var(--warning)', padding: '1rem', borderRadius: '12px', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <div style={{ background: 'rgba(180, 83, 9, 0.1)', padding: '0.75rem', borderRadius: '10px' }}>
-                      <FileUp className="text-warning" />
-                    </div>
-                    <div>
-                      <p style={{ fontWeight: 600 }}>Inasistencia detectada</p>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Requiere justificación técnica</p>
-                    </div>
-                    <button className="btn-primary" style={{ marginLeft: 'auto', padding: '0.5rem 1rem', fontSize: '0.8rem' }} onClick={() => setActiveTab('justifications')}>Justificar</button>
-                  </div>
-                ) : (
-                  <p className="text-muted" style={{ fontSize: '0.9rem' }}>No tienes alertas pendientes. ¡Buen trabajo!</p>
-                )}
+                {(() => {
+                  const now = new Date();
+                  // Generar fecha local "YYYY-MM-DD" manualmente para evitar desfases de zona horaria (UTC vs Local)
+                  const year = now.getFullYear();
+                  const month = String(now.getMonth() + 1).padStart(2, '0');
+                  const day = String(now.getDate()).padStart(2, '0');
+                  const todayStr = `${year}-${month}-${day}`;
+
+                  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                  const todayName = days[now.getDay()];
+
+                  // 1. Inasistencias pasadas registradas en la DB sin justificación
+                  const unjustifiedExplicit = myAttendance.filter(a => {
+                    const aDateStr = a.check_in_raw ? a.check_in_raw.split('T')[0] : '';
+                    return a.status === 'Ausente' &&
+                      !myJustifications.some(j => j.absence_date === aDateStr);
+                  });
+
+                  // 2. Inasistencia de HOY (Inferencia si ya pasó la hora de clase)
+                  const hasAttendedToday = myAttendance.some(a =>
+                    a.check_in_raw && a.check_in_raw.split('T')[0] === todayStr
+                  );
+
+                  let hasTodayMissedClass = false;
+                  if (!hasAttendedToday && !isCheckedIn) {
+                    const todaysClasses = mySchedule.filter(s => s.day === todayName);
+                    if (todaysClasses.length > 0) {
+                      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                      hasTodayMissedClass = todaysClasses.some(c => {
+                        if (!c.time) return false;
+                        const cleanedTime = c.time.toUpperCase().replace(/\s/g, '');
+                        const match = cleanedTime.match(/^(\d+):(\d+)(AM|PM)$/);
+                        if (!match) return false;
+
+                        let h = parseInt(match[1]);
+                        const m = parseInt(match[2]);
+                        const ampm = match[3];
+
+                        if (ampm === 'PM' && h !== 12) h += 12;
+                        if (ampm === 'AM' && h === 12) h = 0;
+
+                        const classMinutes = h * 60 + m + parseInt(systemSettings?.tolerance || '15');
+                        return currentMinutes > classMinutes;
+                      });
+                    }
+                  }
+
+                  // Verificar si ya se envió justificación para hoy
+                  const isTodayJustified = myJustifications.some(j => j.absence_date === todayStr);
+
+                  const needsAlert = unjustifiedExplicit.length > 0 || (hasTodayMissedClass && !isTodayJustified);
+
+                  if (needsAlert) {
+                    return (
+                      <div className="glass" style={{ border: '1px solid var(--warning)', padding: '1rem', borderRadius: '12px', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <div style={{ background: 'rgba(180, 83, 9, 0.1)', padding: '0.75rem', borderRadius: '10px' }}>
+                          <FileUp className="text-warning" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 600 }}>Inasistencia detectada</p>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Requiere justificativo para regularizar su estatus</p>
+                        </div>
+                        <button className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }} onClick={() => setActiveTab('justifications')}>Justificar</button>
+                      </div>
+                    );
+                  }
+
+                  return <p className="text-muted" style={{ fontSize: '0.9rem' }}>No tienes alertas pendientes. ¡Buen trabajo!</p>;
+                })()}
               </div>
             </div>
           </motion.div>
@@ -1324,7 +1438,7 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
                   <textarea
                     rows="3"
                     value={justificationReason}
-                    onChange={(e) => setJustificationReason(e.target.value)}
+                    onChange={(e) => setJustificationReason(e.target.value.substring(0, 500))}
                     placeholder="Describe el motivo de la inasistencia..."
                     style={{
                       width: '100%',
@@ -1337,6 +1451,9 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
                       resize: 'none'
                     }}
                   />
+                  <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                    {justificationReason.length}/500 caracteres
+                  </div>
                 </div>
                 <div className="input-group">
                   <label>Comprobante (Opcional)</label>
@@ -1361,7 +1478,15 @@ const TeacherDashboard = ({ onLogout, user, systemSettings }) => {
                       id="justificationFile"
                       type="file"
                       hidden
-                      onChange={(e) => setJustificationFile(e.target.files[0])}
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file && !file.type.startsWith('image/')) {
+                          alert('Por favor selecciona un archivo de imagen válido');
+                          return;
+                        }
+                        setJustificationFile(file);
+                      }}
                     />
                   </div>
                 </div>
@@ -1692,6 +1817,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
   const [showChairTypeDropdown, setShowChairTypeDropdown] = useState(false);
   const [editingFaculty, setEditingFaculty] = useState(null);
   const [editingChair, setEditingChair] = useState(null);
+  const [editingAssignment, setEditingAssignment] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [chairSearch, setChairSearch] = useState('');
   const [chairTypeFilter, setChairTypeFilter] = useState('Todos');
@@ -1772,8 +1898,8 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
           // Esta función actualiza todo el Dashboard (gráficas, contadores, lista)
           fetchAllData();
 
-          // Lógica de notificaciones (solo si están habilitadas)
-          if (systemSettings.notificationsEnabled) {
+          // Lógica de notificaciones (Siempre activa para el panel admin)
+          if (true) {
             let teacherName = 'Un profesor';
             if (payload.new && payload.new.faculty_id) {
               const localTeacher = facultyMembers.find(f => f.id === payload.new.faculty_id);
@@ -1813,8 +1939,8 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
         console.log('Estado suscripción Realtime:', status);
       });
 
-    // Solicitar permiso de notificaciones por separado si están habilitadas
-    if (systemSettings.notificationsEnabled && typeof Notification !== 'undefined') {
+    // Solicitar permiso de notificaciones al navegador
+    if (typeof Notification !== 'undefined') {
       if (Notification.permission === 'default') {
         Notification.requestPermission();
       }
@@ -2039,7 +2165,17 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
   // Funciones para Personal Docente (Reales con Supabase)
   const handleAddFaculty = async () => {
     if (!facultyForm.name || !facultyForm.email || !facultyForm.phone) {
-      alert('Por favor complete todos los campos');
+      alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+
+    if (facultyForm.name.length > LIMITS.NAME) {
+      alert(`El nombre es muy largo (máximo ${LIMITS.NAME} caracteres)`);
+      return;
+    }
+
+    if (!validateEmail(facultyForm.email)) {
+      alert('Por favor ingrese un correo electrónico válido');
       return;
     }
 
@@ -2084,7 +2220,17 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
 
   const handleEditFaculty = async () => {
     if (!facultyForm.name || !facultyForm.email || !facultyForm.phone) {
-      alert('Por favor complete todos los campos');
+      alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+
+    if (facultyForm.name.length > LIMITS.NAME) {
+      alert(`El nombre es muy largo (máximo ${LIMITS.NAME} caracteres)`);
+      return;
+    }
+
+    if (!validateEmail(facultyForm.email)) {
+      alert('Por favor ingrese un correo electrónico válido');
       return;
     }
 
@@ -2116,7 +2262,17 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
 
   const handleCreateUser = async () => {
     if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
-      alert('Por favor complete los campos obligatorios');
+      alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+
+    if (newUserForm.name.length > LIMITS.NAME) {
+      alert(`El nombre es muy largo (máximo ${LIMITS.NAME} caracteres)`);
+      return;
+    }
+
+    if (!validateEmail(newUserForm.email)) {
+      alert('Por favor ingrese un correo electrónico válido');
       return;
     }
 
@@ -2287,7 +2443,17 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
   // Funciones para Cátedras (Reales con Supabase)
   const handleAddChair = async () => {
     if (!chairForm.name || !chairForm.room) {
-      alert('Por favor complete todos los campos');
+      alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+
+    if (chairForm.name.length > LIMITS.CHAIR) {
+      alert(`El nombre de la cátedra es muy largo (máximo ${LIMITS.CHAIR} caracteres)`);
+      return;
+    }
+
+    if (chairForm.room.length > LIMITS.ROOM) {
+      alert(`El aula es muy larga (máximo ${LIMITS.ROOM} caracteres)`);
       return;
     }
 
@@ -2312,7 +2478,17 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
 
   const handleEditChair = async () => {
     if (!chairForm.name || !chairForm.room) {
-      alert('Por favor complete todos los campos');
+      alert('Por favor complete todos los campos obligatorios');
+      return;
+    }
+
+    if (chairForm.name.length > LIMITS.CHAIR) {
+      alert(`El nombre de la cátedra es muy largo (máximo ${LIMITS.CHAIR} caracteres)`);
+      return;
+    }
+
+    if (chairForm.room.length > LIMITS.ROOM) {
+      alert(`El aula es muy larga (máximo ${LIMITS.ROOM} caracteres)`);
       return;
     }
 
@@ -2357,21 +2533,38 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
     }
 
     try {
-      const { error } = await supabase.from('master_schedule').insert([
-        {
-          faculty_id: assignmentForm.professorId,
-          chair_id: assignmentForm.chairId,
-          day: assignmentForm.day,
-          time: assignmentForm.time,
-          room: assignmentForm.room || activeChairAssignment?.room
-        }
-      ]);
+      if (editingAssignment) {
+        const { error } = await supabase
+          .from('master_schedule')
+          .update({
+            faculty_id: assignmentForm.professorId,
+            chair_id: assignmentForm.chairId,
+            day: assignmentForm.day,
+            time: assignmentForm.time,
+            room: assignmentForm.room || activeChairAssignment?.room
+          })
+          .eq('id', editingAssignment.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        showNotification('Horario actualizado con éxito');
+      } else {
+        const { error } = await supabase.from('master_schedule').insert([
+          {
+            faculty_id: assignmentForm.professorId,
+            chair_id: assignmentForm.chairId,
+            day: assignmentForm.day,
+            time: assignmentForm.time,
+            room: assignmentForm.room || activeChairAssignment?.room
+          }
+        ]);
 
-      showNotification('Horario asignado con éxito');
+        if (error) throw error;
+        showNotification('Horario asignado con éxito');
+      }
+
       fetchAllData();
       setShowAddScheduleModal(false);
+      setEditingAssignment(null);
     } catch (error) {
       alert('Error: ' + error.message);
     }
@@ -3243,7 +3436,8 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                               <span className="badge badge-success">Activo</span>
                             </td>
                             <td style={{ padding: '1rem' }}>
-                              {f.email !== 'admin@conservatorio.ve' ? (
+                              {/* El propio usuario admin no se puede borrar a sí mismo por seguridad (para no quedar bloqueado) */}
+                              {f.id !== user?.id ? (
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                   <button
                                     onClick={() => {
@@ -3502,7 +3696,11 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                   <button
                     className="btn-primary"
                     style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', borderRadius: '12px' }}
-                    onClick={() => setShowAddScheduleModal(true)}
+                    onClick={() => {
+                      setEditingAssignment(null);
+                      setAssignmentForm({ professorId: '', chairId: '', day: 'Lunes', time: '', room: '' });
+                      setShowAddScheduleModal(true);
+                    }}
                   >
                     <Plus size={16} /> <span style={{ whiteSpace: 'nowrap' }}>Asignar Nuevo Horario</span>
                   </button>
@@ -3530,12 +3728,32 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                           <td style={{ padding: '1.25rem 1.5rem', fontWeight: 600 }}>{item.time}</td>
                           <td style={{ padding: '1.25rem 1.5rem' }}>{item.room}</td>
                           <td style={{ padding: '1.25rem 1.5rem' }}>
-                            <button
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
-                              onClick={() => handleDeleteAssignment(item.id)}
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--secondary)' }}
+                                title="Editar Horario"
+                                onClick={() => {
+                                  setAssignmentForm({
+                                    professorId: item.faculty_id,
+                                    chairId: item.chair_id,
+                                    day: item.day,
+                                    time: item.time,
+                                    room: item.room || ''
+                                  });
+                                  setEditingAssignment(item);
+                                  setShowAddScheduleModal(true);
+                                }}
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
+                                title="Eliminar Horario"
+                                onClick={() => handleDeleteAssignment(item.id)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -3942,7 +4160,6 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
               <div className="settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'sticky', top: '2rem' }}>
                 {[
                   { id: 'General', icon: <Globe size={18} /> },
-                  { id: 'Notificaciones', icon: <BellRing size={18} /> },
                   { id: 'Seguridad', icon: <ShieldCheck size={18} /> }
                 ].map(item => (
                   <button
@@ -4016,52 +4233,6 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                     </motion.div>
                   )}
 
-                  {settingsTab === 'Notificaciones' && (
-                    <motion.div
-                      key="notifications"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                    >
-                      <h3 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <BellRing size={20} className="text-forest" /> Preferencias de Notificación
-                      </h3>
-
-                      <div className="card" style={{ padding: '1.5rem', marginBottom: '1rem', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <h4 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>Inasistencias y Retrasos</h4>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', gap: '1rem' }}>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontWeight: 600 }}>Alertas Inmediatas</p>
-                            <p className="text-muted" style={{ fontSize: '0.85rem' }}>Recibir un email cuando un profesor marque "Tarde" o no llegue.</p>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={systemSettings.notificationsEnabled}
-                            onChange={(e) => setSystemSettings({ ...systemSettings, notificationsEnabled: e.target.checked })}
-                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)', flexShrink: 0 }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontWeight: 600 }}>Resumen Semanal</p>
-                            <p className="text-muted" style={{ fontSize: '0.85rem' }}>Reporte de estadísticas enviado los viernes.</p>
-                          </div>
-                          <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)', flexShrink: 0 }} />
-                        </div>
-                      </div>
-
-                      <div className="card" style={{ padding: '1.5rem', border: '1px solid rgba(0,0,0,0.05)' }}>
-                        <h4 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>Sistema</h4>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontWeight: 600 }}>Mantenimiento</p>
-                            <p className="text-muted" style={{ fontSize: '0.85rem' }}>Avisos sobre actualizaciones del sistema.</p>
-                          </div>
-                          <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--secondary)', flexShrink: 0 }} />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
 
                   {settingsTab === 'Seguridad' && (
                     <motion.div
@@ -4128,7 +4299,6 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                           institutionName: 'Conservatorio de Música Juan Manuel Olivares',
                           openingTime: '07:00',
                           tolerance: '15',
-                          notificationsEnabled: true,
                           backupEmail: 'sistemas@olivares.edu.ve'
                         });
                       }
@@ -4262,7 +4432,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                   type="text"
                   placeholder="Ej: Cátedra de Arpa"
                   value={chairForm.name}
-                  onChange={(e) => setChairForm({ ...chairForm, name: e.target.value })}
+                  onChange={(e) => setChairForm({ ...chairForm, name: e.target.value.substring(0, LIMITS.CHAIR) })}
                 />
               </div>
               <div className="grid-cols-2">
@@ -4352,7 +4522,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                     type="text"
                     placeholder="Ej: 101"
                     value={chairForm.room}
-                    onChange={(e) => setChairForm({ ...chairForm, room: e.target.value })}
+                    onChange={(e) => setChairForm({ ...chairForm, room: e.target.value.substring(0, LIMITS.ROOM) })}
                   />
                 </div>
               </div>
@@ -4391,7 +4561,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                   type="text"
                   placeholder="Ej: María Fernández"
                   value={facultyForm.name}
-                  onChange={(e) => setFacultyForm({ ...facultyForm, name: e.target.value })}
+                  onChange={(e) => setFacultyForm({ ...facultyForm, name: e.target.value.substring(0, LIMITS.NAME) })}
                 />
               </div>
 
@@ -4402,7 +4572,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                     type="email"
                     placeholder="profesor@musica.ve"
                     value={facultyForm.email}
-                    onChange={(e) => setFacultyForm({ ...facultyForm, email: e.target.value })}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, email: e.target.value.trim() })}
                   />
                 </div>
                 <div className="input-group">
@@ -4411,7 +4581,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                     type="tel"
                     placeholder="+58 412 1234567"
                     value={facultyForm.phone}
-                    onChange={(e) => setFacultyForm({ ...facultyForm, phone: e.target.value })}
+                    onChange={(e) => setFacultyForm({ ...facultyForm, phone: cleanPhone(e.target.value).substring(0, LIMITS.PHONE) })}
                   />
                 </div>
               </div>
@@ -4735,7 +4905,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                   type="text"
                   placeholder="Ej: María Pérez"
                   value={newUserForm.name}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value.substring(0, LIMITS.NAME) })}
                 />
               </div>
 
@@ -4745,7 +4915,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                   type="email"
                   placeholder="usuario@musica.ve"
                   value={newUserForm.email}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value.trim() })}
                 />
               </div>
 
@@ -4822,7 +4992,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                       type="text"
                       placeholder="+58 412 0000000"
                       value={newUserForm.phone}
-                      onChange={(e) => setNewUserForm({ ...newUserForm, phone: e.target.value })}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, phone: cleanPhone(e.target.value).substring(0, LIMITS.PHONE) })}
                     />
                   </div>
                   <div className="input-group">
@@ -4831,7 +5001,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                       type="text"
                       placeholder="Ej: Piano, Violín"
                       value={newUserForm.chair}
-                      onChange={(e) => setNewUserForm({ ...newUserForm, chair: e.target.value })}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, chair: e.target.value.substring(0, LIMITS.CHAIR) })}
                     />
                   </div>
                 </motion.div>
@@ -4876,7 +5046,9 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
         {showAddScheduleModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="card" style={{ maxWidth: '500px', width: '90%', padding: '2.5rem' }}>
-              <h3 className="brand-font" style={{ fontSize: '1.75rem', marginBottom: '1.5rem' }}>Asignar Nuevo Horario</h3>
+              <h3 className="brand-font" style={{ fontSize: '1.75rem', marginBottom: '1.5rem' }}>
+                {editingAssignment ? 'Editar Horario' : 'Asignar Nuevo Horario'}
+              </h3>
               <div style={{ display: 'grid', gap: '1rem' }}>
                 {/* Custom Professor Selection */}
                 <div className="input-group">
@@ -5115,7 +5287,7 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                       type="text"
                       placeholder="ej: 08:00 AM"
                       value={assignmentForm.time}
-                      onChange={(e) => setAssignmentForm({ ...assignmentForm, time: e.target.value })}
+                      onChange={(e) => setAssignmentForm({ ...assignmentForm, time: cleanTime(e.target.value) })}
                       style={{ width: '100%', padding: '0.9rem 1.2rem', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }}
                     />
                   </div>
@@ -5133,8 +5305,13 @@ const AdminDashboard = ({ onLogout, user, systemSettings: globalSettings, update
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={handleAddAssignment}>Asignar Horario</button>
-                <button className="btn-outline" style={{ flex: 1 }} onClick={() => setShowAddScheduleModal(false)}>Cancelar</button>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={handleAddAssignment}>
+                  {editingAssignment ? 'Guardar Cambios' : 'Asignar Horario'}
+                </button>
+                <button className="btn-outline" style={{ flex: 1 }} onClick={() => {
+                  setShowAddScheduleModal(false);
+                  setEditingAssignment(null);
+                }}>Cancelar</button>
               </div>
             </motion.div>
           </div>
@@ -5306,7 +5483,46 @@ function App() {
     <>
       <AnimatePresence mode="wait">
         {view === 'login' && <LoginPage key="login" onLogin={handleLogin} systemSettings={systemSettings} />}
-        {view === 'teacher' && <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} systemSettings={systemSettings} />}
+
+        {view === 'teacher' && (() => {
+          const now = new Date();
+          const [openHour, openMin] = (systemSettings?.openingTime || '07:00').split(':').map(Number);
+          const isClosed = now.getHours() < openHour || (now.getHours() === openHour && now.getMinutes() < openMin);
+
+          if (isClosed) {
+            return (
+              <motion.div
+                key="closed"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-cream)', textAlign: 'center', padding: '2rem' }}
+              >
+                <div style={{ background: 'white', padding: '3rem', borderRadius: '32px', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.05)', maxWidth: '500px' }}>
+                  <div style={{ background: 'rgba(212, 122, 77, 0.1)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
+                    <Clock size={40} style={{ color: 'var(--primary)' }} />
+                  </div>
+                  <h1 className="brand-font" style={{ fontSize: '2.5rem', color: 'var(--secondary)', marginBottom: '1rem' }}>Sistema Cerrado</h1>
+                  <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+                    El acceso para docentes está restringido hasta la hora de apertura oficial de la institución:
+                  </p>
+                  <div style={{ margin: '1.5rem 0', padding: '1rem', background: 'var(--bg-cream)', borderRadius: '16px', fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
+                    {systemSettings?.openingTime || '07:00'}
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '2rem' }}>
+                    Por favor, regrese cuando el establecimiento esté abierto.
+                  </p>
+                  <button onClick={handleLogout} className="btn-outline" style={{ width: '100%' }}>
+                    Cerrar Sesión
+                  </button>
+                </div>
+              </motion.div>
+            );
+          }
+
+          return <TeacherDashboard key="teacher" onLogout={handleLogout} user={user} systemSettings={systemSettings} />;
+        })()}
+
         {view === 'admin' && <AdminDashboard key="admin" onLogout={handleLogout} user={user} systemSettings={systemSettings} updateSystemSettings={updateSystemSettings} />}
       </AnimatePresence>
       <PasswordResetModal />
