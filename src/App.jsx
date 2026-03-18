@@ -374,12 +374,17 @@ const LoginPage = ({ onLogin, systemSettings }) => {
     }
   };
 
+
   const handleSignIn = async () => {
     setLoading(true);
     setError(null);
     try {
       // 1. Validar formato antes de intentar en Supabase
-      const isActuallyAdmin = email.toLowerCase().includes('admin');
+      const lowerEmail = email.trim().toLowerCase();
+      
+      // Permitir si incluye 'admin' o si es el correo específico de la escuela
+      const isActuallyAdmin = lowerEmail.includes('admin') || 
+                            lowerEmail.includes('escuelamusicaolivares');
 
       if (isAdminMode && !isActuallyAdmin) {
         throw new Error('Solo cuentas de administrador pueden usar este acceso.');
@@ -390,14 +395,15 @@ const LoginPage = ({ onLogin, systemSettings }) => {
       }
 
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: lowerEmail,
         password,
       });
 
       if (authError) throw authError;
 
       // 2. Doble verificación de rol al entrar
-      const role = data.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher';
+      const userEmail = data.user.email.trim().toLowerCase();
+      const role = (userEmail.includes('admin') || userEmail.includes('escuelamusicaolivares')) ? 'admin' : 'teacher';
 
       // Si el rol detectado no coincide con el modo seleccionado, cerramos sesión inmediatamente
       if ((isAdminMode && role !== 'admin') || (!isAdminMode && role !== 'teacher')) {
@@ -5424,7 +5430,7 @@ function App() {
           .eq('id', session.user.id)
           .single();
 
-        const role = profile?.role || (session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher');
+        const role = profile?.role || ((session.user.email.toLowerCase().includes('admin') || session.user.email.toLowerCase().includes('escuelamusicaolivares')) ? 'admin' : 'teacher');
         setView(role);
       }
       fetchSystemSettings();
@@ -5452,7 +5458,7 @@ function App() {
             .eq('id', session.user.id)
             .single();
 
-          const role = profile?.role || (session.user.email.toLowerCase().includes('admin') ? 'admin' : 'teacher');
+          const role = profile?.role || ((session.user.email.toLowerCase().includes('admin') || session.user.email.toLowerCase().includes('escuelamusicaolivares')) ? 'admin' : 'teacher');
           setView(role);
         };
 
